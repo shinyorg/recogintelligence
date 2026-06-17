@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Sample.ViewModels"
+             x:Class="Sample.Pages.ScanPage"
+             x:DataType="vm:ScanViewModel"
+             Title="Scan">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="16" RowSpacing="12">
+        <Button Grid.Row="0"
+                Text="Scan Document"
+                Command="{Binding ScanCommand}" />
+
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Pages}">
+            <CollectionView.EmptyView>
+                <Label Text="No pages yet. Scan a document to see its pages here."
+                       HorizontalOptions="Center" VerticalOptions="Center" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="ImageSource">
+                    <Border Margin="0,6" Stroke="#22000000" StrokeShape="RoundRectangle 8">
+                        <Image Source="{Binding .}" Aspect="AspectFit" HeightRequest="260" />
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Label Grid.Row="2" Text="{Binding StatusText}" HorizontalTextAlignment="Center" />
+    </Grid>
+
+</ContentPage>

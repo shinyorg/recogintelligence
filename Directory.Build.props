@@ -1,0 +1,10 @@
+<Project>
+
+    <!-- Shared across every project (libraries, Sample, tests, benchmarks). Per-project settings
+         (TargetFramework, IsAotCompatible, Description, IsPackable) stay in the individual csproj. -->
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+</Project>

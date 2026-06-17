@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- IFaceEmbedder/FaceBox + SkiaSharp (transitive) for building real, decodable test images. -->
+        <ProjectReference Include="..\..\src\Shiny.FaceIntelligence\Shiny.FaceIntelligence.csproj" />
+    </ItemGroup>
+
+</Project>

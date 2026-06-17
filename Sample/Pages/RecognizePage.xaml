@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:cam="http://shiny.net/maui/camera"
+             xmlns:vm="clr-namespace:Sample.ViewModels"
+             x:Class="Sample.Pages.RecognizePage"
+             x:DataType="vm:RecognizeViewModel"
+             Title="Recognize">
+
+    <Grid>
+        <!-- Live preview. The FaceAnalyzer detects faces on-device and, with CaptureOnDetection,
+             pairs each detection with a still frame delivered to DetectionCaptured. -->
+        <cam:CameraView x:Name="Camera"
+                        Facing="Front"
+                        ScaleMode="AspectFill"
+                        DetectionCaptured="OnDetectionCaptured">
+            <cam:FaceAnalyzer IsEnabled="True"
+                              CaptureOnDetection="True"
+                              ShowBoundingBox="True" />
+        </cam:CameraView>
+
+        <Border VerticalOptions="End"
+                Margin="16"
+                Padding="16,12"
+                BackgroundColor="#CC000000"
+                StrokeShape="RoundRectangle 14">
+            <Label Text="{Binding ResultText}"
+                   TextColor="White"
+                   FontSize="18"
+                   HorizontalTextAlignment="Center" />
+        </Border>
+    </Grid>
+
+</ContentPage>

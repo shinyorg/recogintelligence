@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsAotCompatible>true</IsAotCompatible>
+        <Description>Face enrollment + recognition pipeline (contracts, orchestration, imaging). Add an embedder (Shiny.FaceIntelligence.Onnx) and a store (Shiny.FaceIntelligence.DocumentDb.Sqlite).</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- SkiaSharp for face crop/resize/thumbnail; DI abstractions for the registration builder. -->
+        <PackageReference Include="SkiaSharp" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsAotCompatible>true</IsAotCompatible>
+        <Description>ONNX ArcFace embedder for Shiny.FaceIntelligence (Microsoft.ML.OnnxRuntime). Ships the iOS/MacCatalyst RegisterCustomOps linker workaround.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Flows the iOS/MacCatalyst RegisterCustomOps linker workaround into the consuming app head
+             (buildTransitive => applies even when this package is a transitive dependency). -->
+        <None Include="build\Shiny.FaceIntelligence.Onnx.targets" Pack="true" PackagePath="build;buildTransitive" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Shiny.FaceIntelligence\Shiny.FaceIntelligence.csproj" />
+    </ItemGroup>
+
+</Project>

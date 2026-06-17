@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsAotCompatible>true</IsAotCompatible>
+        <Description>Turnkey SQLite (sqlite-vec) face store for Shiny.FaceIntelligence. Bundle the vec0 native binary per platform.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Shiny.DocumentDb.Sqlite" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Shiny.FaceIntelligence.DocumentDb\Shiny.FaceIntelligence.DocumentDb.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- Native, modal document-scanner service. iOS/MacCatalyst + Android ship a first-party
+             modal scanner; macOS AppKit has none, so it uses Vision document segmentation on picked
+             images. The bare net10.0 target is a throwing stub so the package restores everywhere. -->
+        <TargetFrameworks>net10.0;net10.0-android;net10.0-ios;net10.0-maccatalyst;net10.0-macos</TargetFrameworks>
+        <Description>On-device document scanning for .NET: VisionKit (iOS/Mac Catalyst), ML Kit (Android), and Vision document segmentation (macOS AppKit), behind one IDocumentScanner.</Description>
+
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">13.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'macos'">12.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    </ItemGroup>
+
+    <!-- Per-platform source. Everything under Platforms/ is opted out, then opted back in by TFM. -->
+    <ItemGroup>
+        <Compile Remove="Platforms/**/*.cs" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetPlatformIdentifier)' == ''">
+        <Compile Include="Platforms/Net/**/*.cs" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'ios' Or '$(TargetPlatformIdentifier)' == 'maccatalyst'">
+        <Compile Include="Platforms/Apple/**/*.cs" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'macos'">
+        <Compile Include="Platforms/MacOS/**/*.cs" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'android'">
+        <Compile Include="Platforms/Android/**/*.cs" />
+        <PackageReference Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" />
+    </ItemGroup>
+
+</Project>
