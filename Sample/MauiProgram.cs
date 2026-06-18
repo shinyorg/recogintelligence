@@ -37,7 +37,6 @@ public static class MauiProgram
             face.UseSqliteStore(o =>
             {
                 o.ConnectionString = $"Data Source={Path.Combine(dataDir, "faces.db")}";
-                o.VectorExtensionPath = "vec0"; // loader searches the app dir + OS paths
             });
         });
 

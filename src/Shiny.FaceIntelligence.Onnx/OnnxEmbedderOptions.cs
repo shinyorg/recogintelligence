@@ -14,8 +14,17 @@ public class OnnxEmbedderOptions
     public byte[]? ModelBytes { get; set; }
 
     /// <summary>
-    /// Lazy model-bytes loader, invoked on first embedder resolve. Preferred on iOS/Android: e.g.
-    /// <c>() => ReadAppPackageBytes("arcface.onnx")</c>. Bundled assets aren't real file paths.
+    /// Lazy model-bytes loader, invoked on the <b>first enroll/recognize</b> (not at startup or DI resolve).
+    /// Preferred on iOS/Android: e.g. <c>() => ReadAppPackageBytes("arcface.onnx")</c>. Bundled assets aren't
+    /// real file paths. A missing model therefore throws <see cref="System.IO.FileNotFoundException"/> from the
+    /// first <c>Embed</c> call — where the enroll/recognize pages catch it — instead of crashing at launch.
     /// </summary>
     public Func<byte[]>? ModelBytesProvider { get; set; }
+
+    /// <summary>
+    /// Output embedding dimension, reported by the embedder before the model loads so the vector store can
+    /// size its index up front (the model loads lazily, so its real dimension isn't known yet). Defaults to
+    /// <c>512</c> (ArcFace r50/MobileFaceNet). Set this only if your model emits a different width.
+    /// </summary>
+    public int Dimensions { get; set; } = 512;
 }

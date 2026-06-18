@@ -20,7 +20,7 @@ public static class SqliteStoreRegistration
         return builder.UseDocumentDbStore(_ => new SqliteDatabaseProvider(options.ConnectionString)
         {
             EnableVectorExtension = true,
-            VectorExtensionPath = options.VectorExtensionPath
+            VectorExtensionPreloaded = true
         });
     }
 }

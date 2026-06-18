@@ -15,22 +15,27 @@ public class FaceIntelligenceManager(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        var embedding = embedder.Embed(imageData, face);
-        var person = new Person
+        // Embedding (ONNX inference) and thumbnail encoding (image decode) are synchronous and CPU-bound,
+        // and the first embed also loads the model — run them off the caller's thread so awaiting from a UI
+        // thread never blocks the UI. See also Recognize.
+        var name2 = name.Trim();
+        var person = await Task.Run(() => new Person
         {
             Id = Guid.NewGuid().ToString("n"), // string ids must be explicit
-            Name = name.Trim(),
-            Embedding = embedding,
+            Name = name2,
+            Embedding = embedder.Embed(imageData, face),
             Thumbnail = FaceImaging.EncodeThumbnail(imageData, face),
             EnrolledAt = DateTimeOffset.UtcNow
-        };
+        }, ct);
         await store.Add(person, ct);
         return person;
     }
 
     public async Task<RecognitionResult> Recognize(byte[] imageData, FaceBox face, CancellationToken ct = default)
     {
-        var query = embedder.Embed(imageData, face);
+        // Embed() is synchronous and CPU-bound (and lazily loads the model on first call) — offload it so a
+        // caller awaiting on the UI thread keeps a responsive UI / live camera preview.
+        var query = await Task.Run(() => embedder.Embed(imageData, face), ct);
         var hits = await store.FindNearest(query, options.CandidateCount, ct);
 
         if (hits.Count == 0)

@@ -30,9 +30,15 @@
     <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'macos'">
         <Compile Include="Platforms/MacOS/**/*.cs" />
     </ItemGroup>
+    <!-- Vision OCR + barcode decode are identical across the three Apple platforms (no UIKit/AppKit split). -->
+    <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'ios' Or '$(TargetPlatformIdentifier)' == 'maccatalyst' Or '$(TargetPlatformIdentifier)' == 'macos'">
+        <Compile Include="Platforms/AppleVision/**/*.cs" />
+    </ItemGroup>
     <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'android'">
         <Compile Include="Platforms/Android/**/*.cs" />
         <PackageReference Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" />
+        <PackageReference Include="Xamarin.GooglePlayServices.MLKit.Text.Recognition" />
+        <PackageReference Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" />
     </ItemGroup>
 
 </Project>

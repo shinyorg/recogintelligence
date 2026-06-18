@@ -13,54 +13,69 @@ public sealed class OnnxArcFaceEmbedder : IFaceEmbedder, IDisposable
 {
     const int InputSize = 112;
 
-    readonly InferenceSession session;
-    readonly string inputName;
+    // The session is created lazily on first Embed, NOT in the constructor. The vector store resolves this
+    // embedder up front to read Dimensions; if the constructor loaded the model, a missing/bundled-but-absent
+    // model would throw during DI/ViewModel construction (a launch crash) instead of at first enroll/recognize
+    // where the pages catch FileNotFoundException. So defer the load and report Dimensions from a hint.
+    readonly Lazy<(InferenceSession Session, string InputName)> model;
 
-    /// <summary>Load the model from a file path (desktop/server, or after copying an asset to app data).</summary>
-    public OnnxArcFaceEmbedder(string modelPath)
+    /// <summary>
+    /// Lazily create the inference session. The session isn't built until the first <see cref="Embed"/>; any
+    /// model-load failure (missing file, bad bytes) therefore surfaces from <see cref="Embed"/>, not at
+    /// construction. <paramref name="dimensions"/> is the output width reported before the model loads.
+    /// </summary>
+    public OnnxArcFaceEmbedder(Func<InferenceSession> sessionFactory, int dimensions = 512)
+    {
+        ArgumentNullException.ThrowIfNull(sessionFactory);
+        this.Dimensions = dimensions > 0 ? dimensions : 512;
+        this.model = new Lazy<(InferenceSession, string)>(() =>
+        {
+            var session = sessionFactory();
+            return (session, session.InputMetadata.Keys.First());
+        }, LazyThreadSafetyMode.ExecutionAndPublication);
+    }
+
+    /// <summary>Load the model from a file path (desktop/server, or after copying an asset to app data). Loaded lazily on first use.</summary>
+    public OnnxArcFaceEmbedder(string modelPath, int dimensions = 512)
+        : this(() => CreateFromPath(modelPath), dimensions) { }
+
+    /// <summary>
+    /// Load the model from raw bytes. Preferred on iOS/Android, where a bundled <c>Resources/Raw</c>
+    /// asset isn't a real filesystem path: read it with <c>FileSystem.OpenAppPackageFileAsync</c> and
+    /// pass the bytes here. Loaded lazily on first use.
+    /// </summary>
+    public OnnxArcFaceEmbedder(byte[] modelBytes, int dimensions = 512)
+        : this(() => CreateFromBytes(modelBytes), dimensions) { }
+
+    static InferenceSession CreateFromPath(string modelPath)
     {
         if (string.IsNullOrWhiteSpace(modelPath) || !File.Exists(modelPath))
             throw new FileNotFoundException(
                 $"ArcFace ONNX model not found at '{modelPath}'. Set FaceIntelligenceOptions.ModelPath to a 112×112 ArcFace model (e.g. w600k_r50.onnx).",
                 modelPath);
-
-        this.session = new InferenceSession(modelPath);
-        (this.inputName, this.Dimensions) = Introspect(this.session);
+        return new InferenceSession(modelPath);
     }
 
-    /// <summary>
-    /// Load the model from raw bytes. Preferred on iOS/Android, where a bundled <c>Resources/Raw</c>
-    /// asset isn't a real filesystem path: read it with <c>FileSystem.OpenAppPackageFileAsync</c> and
-    /// pass the bytes here, avoiding the copy-to-app-data dance.
-    /// </summary>
-    public OnnxArcFaceEmbedder(byte[] modelBytes)
+    static InferenceSession CreateFromBytes(byte[] modelBytes)
     {
         ArgumentNullException.ThrowIfNull(modelBytes);
         if (modelBytes.Length == 0)
             throw new ArgumentException("ArcFace ONNX model bytes are empty.", nameof(modelBytes));
-
-        this.session = new InferenceSession(modelBytes);
-        (this.inputName, this.Dimensions) = Introspect(this.session);
-    }
-
-    static (string InputName, int Dimensions) Introspect(InferenceSession session)
-    {
-        var inputName = session.InputMetadata.Keys.First();
-        var dims = session.OutputMetadata.Values.First().Dimensions.Last();
-        if (dims <= 0)
-            dims = 512; // dynamic axis — fall back to the ArcFace r50 default
-        return (inputName, dims);
+        return new InferenceSession(modelBytes);
     }
 
     public int Dimensions { get; }
 
     public ReadOnlyMemory<float> Embed(ReadOnlySpan<byte> imageData, FaceBox face)
     {
+        // Triggers the lazy model load on first call — FileNotFoundException surfaces here, where pages catch it.
+        var (session, inputName) = this.model.Value;
+
         using var bmp = FaceImaging.CropResize(imageData, face, InputSize);
         var input = ToTensor(bmp);
 
-        using var results = this.session.Run(
-            [NamedOnnxValue.CreateFromTensor(this.inputName, input)]);
+        using var results = session.Run(
+            [NamedOnnxValue.CreateFromTensor(inputName, input)]);
 
         var output = results.First().AsEnumerable<float>().ToArray();
         L2Normalize(output);
@@ -99,5 +114,9 @@ public sealed class OnnxArcFaceEmbedder : IFaceEmbedder, IDisposable
             v[i] /= norm;
     }
 
-    public void Dispose() => this.session.Dispose();
+    public void Dispose()
+    {
+        if (this.model.IsValueCreated)
+            this.model.Value.Session.Dispose();
+    }
 }

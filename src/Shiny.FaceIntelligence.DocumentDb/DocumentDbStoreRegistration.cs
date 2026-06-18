@@ -30,6 +30,9 @@ public static class DocumentDbStoreRegistration
             return new DocumentStore(options);
         });
 
-        return builder.UseStore(sp => new DocumentDbFaceStore(sp.GetRequiredService<IDocumentStore>()));
+        // Resolve IDocumentStore lazily so building it (which may open the DB and load the native vector
+        // extension, e.g. vec0) happens on the first enroll/recognize, not while DI constructs the store.
+        return builder.UseStore(sp =>
+            new DocumentDbFaceStore(new Lazy<IDocumentStore>(sp.GetRequiredService<IDocumentStore>)));
     }
 }

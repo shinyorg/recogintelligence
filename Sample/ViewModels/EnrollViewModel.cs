@@ -43,6 +43,7 @@ public partial class EnrollViewModel(IFaceIntelligence recognizer) : ObservableO
         var name = this.Name!.Trim();
         try
         {
+            // The library runs the heavy embed/model-load off the UI thread internally, so a plain await is safe.
             await recognizer.Enroll(name, photoData, box);
             this.shotCount++;
             this.StatusText = $"Enrolled '{name}' — {this.shotCount} shot(s). Capture more for accuracy.";

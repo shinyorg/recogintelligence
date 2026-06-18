@@ -6,13 +6,15 @@
         <File Path="nuget.config" />
         <File Path="README.md" />
     </Folder>
-    <Folder Name="/src/">
-        <Project Path="src/Shiny.DocumentIntelligence/Shiny.DocumentIntelligence.csproj" />
+    <Folder Name="/src/" />
+    <Folder Name="/tests/">
+        <Project Path="tests/Shiny.DocumentIntelligence.Tests/Shiny.DocumentIntelligence.Tests.csproj" />
     </Folder>
     <Project Path="Sample\Sample.csproj" />
     <Project Path="src\Shiny.FaceIntelligence\Shiny.FaceIntelligence.csproj" />
     <Project Path="src\Shiny.FaceIntelligence.Onnx\Shiny.FaceIntelligence.Onnx.csproj" />
     <Project Path="src\Shiny.FaceIntelligence.DocumentDb\Shiny.FaceIntelligence.DocumentDb.csproj" />
+    <Project Path="src/Shiny.DocumentIntelligence/Shiny.DocumentIntelligence.csproj" />
     <Project Path="src\Shiny.FaceIntelligence.DocumentDb.Sqlite\Shiny.FaceIntelligence.DocumentDb.Sqlite.csproj" />
     <Project Path="tests\Shiny.FaceIntelligence.TestKit\Shiny.FaceIntelligence.TestKit.csproj" />
     <Project Path="tests\Shiny.FaceIntelligence.Tests\Shiny.FaceIntelligence.Tests.csproj" />

@@ -8,6 +8,7 @@
 
     <ItemGroup>
         <PackageReference Include="Shiny.DocumentDb.Sqlite" />
+        <PackageReference Include="Shiny.DocumentDb.Sqlite.VectorSupport" />
     </ItemGroup>
 
     <ItemGroup>

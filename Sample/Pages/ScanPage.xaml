@@ -6,26 +6,37 @@
              x:DataType="vm:ScanViewModel"
              Title="Scan">
 
-    <Grid RowDefinitions="Auto,*,Auto" Padding="16" RowSpacing="12">
-        <Button Grid.Row="0"
-                Text="Scan Document"
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="16" RowSpacing="12">
+        <Picker Grid.Row="0"
+                Title="Document type"
+                ItemsSource="{Binding DocumentTypes}"
+                SelectedItem="{Binding SelectedDocumentType}" />
+
+        <Button Grid.Row="1"
+                Text="Scan &amp; Extract"
                 Command="{Binding ScanCommand}" />
 
-        <CollectionView Grid.Row="1" ItemsSource="{Binding Pages}">
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Pages}">
             <CollectionView.EmptyView>
-                <Label Text="No pages yet. Scan a document to see its pages here."
+                <Label Text="No pages yet. Pick a type and scan a document."
                        HorizontalOptions="Center" VerticalOptions="Center" />
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="ImageSource">
                     <Border Margin="0,6" Stroke="#22000000" StrokeShape="RoundRectangle 8">
-                        <Image Source="{Binding .}" Aspect="AspectFit" HeightRequest="260" />
+                        <Image Source="{Binding .}" Aspect="AspectFit" HeightRequest="200" />
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <Label Grid.Row="2" Text="{Binding StatusText}" HorizontalTextAlignment="Center" />
+        <Border Grid.Row="3"
+                IsVisible="{Binding HasExtractedText}"
+                Stroke="#22000000" StrokeShape="RoundRectangle 8" Padding="12">
+            <Label Text="{Binding ExtractedText}" FontFamily="Monospace" />
+        </Border>
+
+        <Label Grid.Row="4" Text="{Binding StatusText}" HorizontalTextAlignment="Center" />
     </Grid>
 
 </ContentPage>

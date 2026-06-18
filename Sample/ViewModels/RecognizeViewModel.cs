@@ -27,6 +27,7 @@ public partial class RecognizeViewModel(IFaceIntelligence recognizer) : Observab
         this.busy = true;
         try
         {
+            // The library runs the heavy embed/model-load off the UI thread internally, so a plain await is safe.
             var result = await recognizer.Recognize(photoData, box);
             this.ResultText = result.IsMatch
                 ? $"{result.Name}  ·  {result.Similarity:P0}"

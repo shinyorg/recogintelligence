@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <!-- xUnit1051: CancellationToken on awaited extractor calls — not relevant for these tests. -->
+        <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="xunit.v3" />
+        <PackageReference Include="xunit.runner.visualstudio" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Reference the bare net10.0 build of the scanner: the parsers + orchestrator are cross-platform,
+             so they exercise without any device/native dependency. -->
+        <ProjectReference Include="..\..\src\Shiny.DocumentIntelligence\Shiny.DocumentIntelligence.csproj" />
+    </ItemGroup>
+
+</Project>
