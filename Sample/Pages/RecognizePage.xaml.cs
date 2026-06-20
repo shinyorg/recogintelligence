@@ -8,6 +8,8 @@ namespace Sample.Pages;
 // All recognition logic lives in RecognizeViewModel, assigned as BindingContext by Shiny Shell.
 public partial class RecognizePage : ContentPage
 {
+    bool capturing;
+
     public RecognizePage() => this.InitializeComponent();
 
     protected override async void OnAppearing()
@@ -25,17 +27,33 @@ public partial class RecognizePage : ContentPage
         await this.Camera.StopAsync();
     }
 
-    async void OnDetectionCaptured(object? sender, DetectionCapturedEventArgs e)
+    // Capture is driven off FacesDetected (the CaptureOnDetection/DetectionCaptured path doesn't fire on
+    // iOS in this beta). Recognition is continuous; the capturing guard + the VM's busy flag pace it to
+    // one in-flight cycle so stills don't pile up.
+    async void OnFacesDetected(object? sender, FacesDetectedEventArgs e)
     {
         if (this.BindingContext is not RecognizeViewModel vm)
             return;
-        if (e.Detection is not FacesDetectedEventArgs fe || e.Photo is not { } photo)
+        if (this.capturing)
             return;
 
-        var face = fe.Faces.Largest();
+        var face = e.Faces.Largest();
         if (face is null)
             return;
 
-        await vm.Process(photo.Data, face.ToFaceBox());
+        this.capturing = true;
+        try
+        {
+            var photo = await this.Camera.CapturePhotoAsync();
+            await vm.Process(photo.Data, face.ToFaceBox(photo.Width, photo.Height));
+        }
+        catch
+        {
+            // Transient capture error; the next detected frame retries.
+        }
+        finally
+        {
+            this.capturing = false;
+        }
     }
 }

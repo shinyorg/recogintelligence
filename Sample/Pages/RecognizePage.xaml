@@ -8,15 +8,14 @@
              Title="Recognize">
 
     <Grid>
-        <!-- Live preview. The FaceAnalyzer detects faces on-device and, with CaptureOnDetection,
-             pairs each detection with a still frame delivered to DetectionCaptured. -->
+        <!-- Live preview. The FaceAnalyzer detects faces on-device; we capture a still ourselves off
+             FacesDetected (the CaptureOnDetection/DetectionCaptured path doesn't fire on iOS in this beta). -->
         <cam:CameraView x:Name="Camera"
                         Facing="Front"
-                        ScaleMode="AspectFill"
-                        DetectionCaptured="OnDetectionCaptured">
+                        ScaleMode="AspectFill">
             <cam:FaceAnalyzer IsEnabled="True"
-                              CaptureOnDetection="True"
-                              ShowBoundingBox="True" />
+                              ShowBoundingBox="True"
+                              FacesDetected="OnFacesDetected" />
         </cam:CameraView>
 
         <Border VerticalOptions="End"

@@ -11,17 +11,17 @@
         <cam:CameraView x:Name="Camera"
                         Grid.Row="0"
                         Facing="Front"
-                        ScaleMode="AspectFill"
-                        DetectionCaptured="OnDetectionCaptured">
-            <cam:FaceAnalyzer IsEnabled="True"
-                              CaptureOnDetection="True"
-                              ShowBoundingBox="True" />
+                        ScaleMode="AspectFill">
+            <cam:FaceAnalyzer x:Name="FaceDetector"
+                              IsEnabled="True"
+                              ShowBoundingBox="True"
+                              FacesDetected="OnFacesDetected" />
         </cam:CameraView>
 
         <VerticalStackLayout Grid.Row="1" Padding="16" Spacing="10">
             <Entry Text="{Binding Name}" Placeholder="Name" ReturnType="Done" />
             <Button Text="Capture &amp; Enroll"
-                    Command="{Binding EnrollCommand}" />
+                    Clicked="OnEnrollClicked" />
             <Label Text="{Binding StatusText}"
                    HorizontalTextAlignment="Center" />
         </VerticalStackLayout>

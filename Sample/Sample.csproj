@@ -18,8 +18,8 @@
 		<SingleProject>true</SingleProject>
 		<MauiXamlInflator>SourceGen</MauiXamlInflator>
 
-		<ApplicationTitle>Face Recog</ApplicationTitle>
-		<ApplicationId>org.shiny.facerecog</ApplicationId>
+		<ApplicationTitle>Shiny RecogIQ</ApplicationTitle>
+		<ApplicationId>org.shiny.recogiq</ApplicationId>
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 

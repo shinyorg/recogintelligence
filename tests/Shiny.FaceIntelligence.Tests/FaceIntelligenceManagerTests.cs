@@ -29,7 +29,9 @@ public class FaceIntelligenceManagerTests : IDisposable
             face.UseSqliteStore(o =>
             {
                 o.ConnectionString = $"Data Source={this.dbPath}";
-                o.VectorExtensionPath = Vec0!; // absolute path to the bundled vec0
+                // vec0 is registered as a SQLite auto-extension by UseSqliteStore (preloaded model);
+                // the native binary is resolved from the package's runtimes/<rid>/native assets. The
+                // Vec0Locator guard (RequireVec0) skips when that binary isn't present.
             });
         });
 

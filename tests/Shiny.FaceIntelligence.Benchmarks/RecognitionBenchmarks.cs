@@ -28,8 +28,10 @@ public class RecognitionBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        var vec0 = Vec0Locator.Find()
-            ?? throw new InvalidOperationException("sqlite-vec native binary not found for benchmark.");
+        // sqlite-vec is auto-registered by UseSqliteStore (preloaded model); fail fast with a clear
+        // message if the native binary isn't deployed for this RID.
+        if (Vec0Locator.Find() == null)
+            throw new InvalidOperationException("sqlite-vec native binary not found for benchmark.");
 
         this.dbPath = Path.Combine(Path.GetTempPath(), $"faces_bench_{this.GallerySize}_{Guid.NewGuid():N}.db");
 
@@ -42,7 +44,6 @@ public class RecognitionBenchmarks
             face.UseSqliteStore(o =>
             {
                 o.ConnectionString = $"Data Source={this.dbPath}";
-                o.VectorExtensionPath = vec0;
             });
         });
 
