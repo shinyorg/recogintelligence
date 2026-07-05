@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsAotCompatible>true</IsAotCompatible>
+        <Description>Shiny.DocumentDb-backed voice store for Shiny.VoiceIntelligence (vector search). Provider-agnostic — supply any IDatabaseProvider (Sqlite, Postgres, ...).</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Shiny.DocumentDb" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Shiny.VoiceIntelligence\Shiny.VoiceIntelligence.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsAotCompatible>true</IsAotCompatible>
+        <Description>Turnkey SQLite (sqlite-vec) voice store for Shiny.VoiceIntelligence. Bundle the vec0 native binary per platform.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Shiny.DocumentDb.Sqlite" />
+        <PackageReference Include="Shiny.DocumentDb.Sqlite.VectorSupport" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Shiny.VoiceIntelligence.DocumentDb\Shiny.VoiceIntelligence.DocumentDb.csproj" />
+    </ItemGroup>
+
+</Project>

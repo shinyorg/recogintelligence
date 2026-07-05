@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- ISpeakerEmbedder + Speaker for building deterministic test voiceprints. -->
+        <ProjectReference Include="..\..\src\Shiny.VoiceIntelligence\Shiny.VoiceIntelligence.csproj" />
+    </ItemGroup>
+
+</Project>

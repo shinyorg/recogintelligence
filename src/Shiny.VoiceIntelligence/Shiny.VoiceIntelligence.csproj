@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsAotCompatible>true</IsAotCompatible>
+        <Description>Speaker enrollment + recognition pipeline (contracts, orchestration). Add an embedder (Shiny.VoiceIntelligence.Onnx) and a store (Shiny.VoiceIntelligence.DocumentDb.Sqlite). Audio capture is the app's job — the core takes PCM samples.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- DI abstractions for the registration builder. No ONNX, no DocumentDb, no audio capture. -->
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    </ItemGroup>
+
+</Project>

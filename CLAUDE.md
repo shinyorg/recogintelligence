@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Two on-device intelligence stacks for .NET (MAUI + native), built on the Shiny stack:
+Three on-device intelligence stacks for .NET (MAUI + native), built on the Shiny stack:
 
 1. **Face intelligence** — face **enrollment + recognition**. "Training" here is **enrollment**, not model training: you store ArcFace embeddings per person and recognition is a nearest-neighbor vector lookup with a cosine-distance threshold. No model is trained on-device. Split into a **core abstractions package** plus **swappable embedder and store packages**, composed via a registration builder, so a consumer pulls only what they use (e.g. a platform-native embedder without ONNX, or Postgres/pgvector server-side without sqlite).
-2. **Document intelligence** — a native **modal document scanner** (`Shiny.DocumentIntelligence`) behind a single `IDocumentScanner`. Multi-targeted with a platform-native implementation per OS; no MAUI dependency (it gets platform context natively).
+2. **Voice intelligence** — speaker (voice biometric) **enrollment + recognition**, the audio twin of the face stack: store ECAPA-TDNN speaker embeddings ("voiceprints") per person, recognition is the same nearest-neighbor vector lookup + cosine-distance threshold. Same four-package split (core + `.Onnx` + `.DocumentDb` + `.DocumentDb.Sqlite`), same registration-builder shape. See [Voice intelligence](#voice-intelligence-speaker-recognition--shinyvoiceintelligence).
+3. **Document intelligence** — a native **modal document scanner** (`Shiny.DocumentIntelligence`) behind a single `IDocumentScanner`. Multi-targeted with a platform-native implementation per OS; no MAUI dependency (it gets platform context natively).
 
-Note on naming: types/namespaces use **FaceIntelligence** as the product brand (`Shiny.FaceIntelligence`, `IFaceIntelligence`, `FaceIntelligenceManager`, `AddFaceIntelligence`), but the **operation verbs and result types keep their recognition names** — `Enroll`/`Recognize` and `RecognitionResult`/`FaceMatch` describe the action and data, not the brand. The concrete orchestrator is `FaceIntelligenceManager` (not `FaceIntelligence`, which would collide with the namespace). Solution: `Shiny.FaceIntelligence.slnx`.
+Note on naming: types/namespaces use **FaceIntelligence** as the product brand (`Shiny.FaceIntelligence`, `IFaceIntelligence`, `FaceIntelligenceManager`, `AddFaceIntelligence`), but the **operation verbs and result types keep their recognition names** — `Enroll`/`Recognize` and `RecognitionResult`/`FaceMatch` describe the action and data, not the brand. The concrete orchestrator is `FaceIntelligenceManager` (not `FaceIntelligence`, which would collide with the namespace). Solution: `Recognition Intelligence.slnx`. The **voice** stack follows the identical convention (`Shiny.VoiceIntelligence`, `IVoiceIntelligence`, `VoiceIntelligenceManager`, `AddVoiceIntelligence`; verbs `Enroll`/`Recognize`; results `RecognitionResult`/`VoiceMatch`; document `Speaker`; embedder `ISpeakerEmbedder`).
 
 | Project | TFM(s) | Role / deps |
 |---|---|---|
@@ -17,6 +18,10 @@ Note on naming: types/namespaces use **FaceIntelligence** as the product brand (
 | `src/Shiny.FaceIntelligence.Onnx` | `net10.0` | `OnnxArcFaceEmbedder` + `UseOnnxEmbedder`. Deps: core + Microsoft.ML.OnnxRuntime. **Ships the iOS linker targets.** |
 | `src/Shiny.FaceIntelligence.DocumentDb` | `net10.0` | `DocumentDbFaceStore` + `UseDocumentDbStore(providerFactory)`. Provider-agnostic; deps: core + Shiny.DocumentDb (abstractions). |
 | `src/Shiny.FaceIntelligence.DocumentDb.Sqlite` | `net10.0` | Turnkey `UseSqliteStore` (sqlite-vec). Deps: `.DocumentDb` + Shiny.DocumentDb.Sqlite. |
+| `src/Shiny.VoiceIntelligence` | `net10.0` | **Core** (voice): contracts (`ISpeakerEmbedder`, `IVoiceStore`, `IVoiceIntelligence`), `Speaker`, `RecognitionResult`, `VoiceMatch`, `VoiceIntelligenceManager`, `VoiceIntelligenceRegistrationBuilder` + `AddVoiceIntelligence`. Deps: **DI.Abstractions only** (no SkiaSharp — audio has no image stage). **No ONNX, no DocumentDb, no audio capture.** |
+| `src/Shiny.VoiceIntelligence.Onnx` | `net10.0` | `OnnxEcapaEmbedder` + `UseOnnxEmbedder`. Deps: voice core + Microsoft.ML.OnnxRuntime. **Ships the iOS linker targets** (target name suffixed `_Voice` so it coexists with the face `.Onnx` targets — see below). |
+| `src/Shiny.VoiceIntelligence.DocumentDb` | `net10.0` | `DocumentDbVoiceStore` + `UseDocumentDbStore(providerFactory)`. Provider-agnostic; deps: voice core + Shiny.DocumentDb. |
+| `src/Shiny.VoiceIntelligence.DocumentDb.Sqlite` | `net10.0` | Turnkey `UseSqliteStore` (sqlite-vec). Deps: voice `.DocumentDb` + Shiny.DocumentDb.Sqlite(.VectorSupport). |
 | `src/Shiny.DocumentIntelligence` | `net10.0;net10.0-android;net10.0-ios;net10.0-maccatalyst;net10.0-macos` | **Native document scanner**: `IDocumentScanner` + `AddDocumentIntelligence`. VisionKit (iOS/Catalyst), ML Kit (Android), Vision segmentation (macOS AppKit), throwing stub (bare net10.0). Dep: DI.Abstractions (+ ML Kit binding on Android only). See [Document scanning](#document-scanning-shinydocumentintelligence). |
 | `Sample` (repo root) | `net10.0-android;net10.0-ios` (`maccatalyst` commented out; `windows` only on a Windows host) | MAUI app, **MVVM via Shiny.Maui.Shell**: **Recognize**, **Enroll**, **People**, **Scan** tabs (page↔ViewModel maps, `ShinyShell`). Refs `.Onnx` + `.Sqlite` + `.DocumentIntelligence` (under `..\src\`) via `ProjectReference`. |
 
@@ -56,6 +61,7 @@ dotnet run --project tests/Shiny.FaceIntelligence.Benchmarks -c Release -- --job
 - `Shiny.FaceIntelligence.TestKit` — shared, no test deps: `FakeEmbedder` (deterministic `IFaceEmbedder`), `TestFaces`, `Vec0Locator`.
 - `Shiny.FaceIntelligence.Tests` — E2E. Builds an `IFaceIntelligence` through the **real builder wiring** (`AddFaceIntelligence(face => { face.UseEmbedder(new FakeEmbedder(dim)); face.UseSqliteStore(...); })`) against the **real sqlite-vec store** (file-backed temp DB), fake embedder for controlled geometry. Refs core + `.Sqlite` + TestKit (no ONNX). Covers match/no-match, the cosine-distance threshold (confirms sqlite-vec's `0 = identical` convention the code relies on), multi-shot nearest-neighbor, the name-as-identity conflation (the TODO), `Forget`/`GetAll`, and that the vector dimension is read from the embedder.
 - `Shiny.FaceIntelligence.Benchmarks` — BenchmarkDotNet; `Recognize` latency vs gallery size (100/1k/10k) at the real 512-d width.
+- `Shiny.VoiceIntelligence.TestKit` / `Shiny.VoiceIntelligence.Tests` — the voice twins. Same shape (`AddVoiceIntelligence(voice => { voice.UseEmbedder(new FakeSpeakerEmbedder(dim)); voice.UseSqliteStore(...); })` against the real sqlite-vec store), and they **share the same committed `tests/runtimes/.../vec0` binary**. 10 tests, all passing: match/no-match, empty store, cosine-distance geometry, threshold enforcement, multi-utterance nearest-neighbor, `Forget`/`GetAll`, and a 192-d dimension round-trip. **No fake-image trick needed** (see below) — the voice manager does no decode, so `FakeSpeakerEmbedder` reads the sample buffer directly as the vector and `TestVoices.Utterance(...)` just hands a vector in.
 
 Key design points when extending:
 - **The fake-image trick**: `FaceIntelligenceManager.Enroll` decodes the image with SkiaSharp for its thumbnail, independent of the embedder. So `TestFaces.Image(...)` produces a *real* PNG with the embedding appended as a trailing payload — Skia decodes the PNG, `FakeEmbedder` reads the trailing block. Don't pass raw float buffers as "images"; enrollment will throw on decode.
@@ -110,6 +116,42 @@ Notes:
 Adding `net10.0-ios`/`-maccatalyst` TFMs to any of these packages does **not** help and does **not** remove the targets file. The `_RegisterCustomOps` failure is an **app-head native-link** problem, and a class library (`OutputType=Library`) never performs that link — ORT's own iOS targets even gate the force-loaded `NativeReference` on `'$(OutputType)'!='Library'`, so it wouldn't be added in `.Onnx` regardless of TFM. The `-u` flag comes from the registrar force-referencing the P/Invoke in `Microsoft.ML.OnnxRuntime.Managed` in the **consuming app head**, unaffected by package TFMs. The `buildTransitive` targets file is both required and the correct home for app-head linker behavior.
 
 Keep the **face** packages at **`net10.0` only**. They already serve every consumer (MAUI android/ios/maccatalyst/windows heads **and** server-side enrollment, which has no linker issue since desktop/server loads ORT dynamically). Only multi-target a package if/when it gains genuinely **platform-specific code** — `Shiny.DocumentIntelligence` is exactly that case (it has a native impl per OS, so it multi-targets); a future native `IFaceEmbedder` package (iOS Vision feature print, Android-native) would be another. Core and the existing face packages stay `net10.0`.
+
+## Voice intelligence (speaker recognition — `Shiny.VoiceIntelligence`)
+
+The audio twin of the face stack, deliberately built to the **same architecture** so the two read alike. Speaker (voice biometric) enrollment + recognition: an ECAPA-TDNN / x-vector ONNX model turns a mono utterance into an L2-normalized "voiceprint", stored and matched by the **same sqlite-vec nearest-neighbor + cosine-distance** machinery as faces. It originated as a scaffold in the `~/Desktop/dev/speech` repo (`Shiny.Speech.Biometrics`, brute-force cosine over Shiny.DocumentDb) and was **moved here and re-based on this repo's real ANN vector store** — a strict upgrade — then that scaffold was deleted from the speech repo.
+
+**Parallel to face, one-to-one.** Same builder + validation (`AddVoiceIntelligence` throws unless an `ISpeakerEmbedder` and an `IVoiceStore` are registered, naming `UseOnnxEmbedder`/`UseSqliteStore`), same lazy-model and lazy-store deferral, same "vector dimension read from the embedder" (`MapVectorProperty<Speaker>(s => s.Embedding, embedder.Dimensions, VectorDistance.Cosine)`), same `[JsonIgnore]` embedding living only in the vec0 sidecar, same "one document = one utterance, keyed by free-text `Name`" model (inherits the **same identity-vs-name TODO** as face). `VoicesJsonContext` is the source-gen `JsonSerializerContext` for `Speaker`. Registration reads identically:
+
+```csharp
+services.AddVoiceIntelligence(voice =>
+{
+    voice.Options.MaxDistance = 0.7f;                                            // see tuning caveat below
+    voice.UseOnnxEmbedder(o => o.ModelBytesProvider = () => LoadBundled("ecapa.onnx"));
+    voice.UseSqliteStore(o => o.ConnectionString = "Data Source=voices.db");
+});
+```
+
+**Key differences from face (all deliberate):**
+- **Capture-agnostic core.** Face core takes `byte[] imageData` + `FaceBox`; voice core takes a `float[]` **sample buffer** (mono PCM, [-1,1], at `ISpeakerEmbedder.SampleRate`, default 16 kHz). The library **never touches audio hardware** — capturing (mic/file/stream) is the app's job, exactly as the camera is for face. So voice core has **no SkiaSharp** and no image/thumbnail stage; `Speaker` has no thumbnail.
+- **Embedder input is the raw waveform.** `OnnxEcapaEmbedder` feeds `[1, samples]` (the common ECAPA export) → `Run` → L2-normalize. A model that expects **features (fbank/MFCC)** needs a feature-extraction step added before `Run` — swap in your own `ISpeakerEmbedder` via `UseEmbedder(...)` for that. Dimension hint defaults to **192** (ECAPA-TDNN); ArcFace's 512 does not apply.
+- **The ArcFace model does NOT transfer** — different modality (image→vector vs audio→vector). What transferred is the **ONNX plumbing**: the options/lazy-provider pattern, `UseOnnxEmbedder`, the bundled-asset flow, and the iOS linker `.targets`. You still supply an ECAPA `.onnx`.
+
+**Shared iOS linker `.targets` — the one real cross-package gotcha.** Both `.Onnx` packages auto-import their `build/<PackageId>.targets`, and an app that references **both** (this repo's Sample will) would hit a **duplicate MSBuild target name** error. So `Shiny.VoiceIntelligence.Onnx.targets` is a copy of the face one with the `Target Name` suffixed **`_DropOnnxRegisterCustomOpsForcedSymbol_Voice`**. The `DisableOnnxRegisterCustomOpsWorkaround` property and the `-Wl,-U,_RegisterCustomOps` flag are intentionally **identical** across both (one toggle governs both; the linker de-dupes the repeated `-U`). Everything in [the ONNX linker section](#critical-gotcha-onnx-runtime-iosmaccatalyst-linker-fix) applies verbatim.
+
+**Threshold tuning is unfinished and important.** `VoiceIntelligenceOptions.MaxDistance` defaults to **`0.7`** (permissive) purely as a placeholder. Speaker-embedding score distributions vary far more by model/channel than face does — this **must** be tuned against your actual ECAPA export with measured FAR/FRR before it means anything. Don't ship the default.
+
+### Anti-spoofing (findings — not yet built in either repo)
+
+Plain voiceprint matching is **defeated by a recording or a voice clone** — treat it as a convenience factor, not a security gate. A `grep` confirms **no liveness/anti-spoofing (PAD) exists anywhere in this repo yet**. Roadmap, cheapest-and-strongest first:
+1. **Challenge–response (biggest win, no new model).** Generate a random prompt (random digits) per attempt; require the user to say *that*, and gate on (a) an STT transcript matching the prompt **and** (b) the speaker embedding matching. A recording/stockpiled voicebank can't answer an unknown prompt — kills the whole replay class. Needs a speech-to-text service (the speech repo's `ISpeechToTextService`, or platform STT).
+2. **A countermeasure (CM) model** — an `ISpoofDetector` seam (bonafide-vs-spoof classifier: AASIST / RawNet2 / LCNN from ASVspoof, ONNX, same plumbing as the embedder). Passive net for synthetic audio; generalizes poorly to unseen attacks, so a filter not a wall.
+3. **Multimodal liveness** — this repo's real edge: combine **face liveness + the voice challenge** ("look at the camera and say 7-4-1-9"). Strong on-device gate that neither modality gives alone; an argument for keeping face + voice in one repo.
+
+### Not yet built (voice)
+
+- **No Sample tab.** The face Sample has Recognize/Enroll/People tabs; voice has none yet. Blocked on one decision: **where mic capture comes from** — the recogintelligence Sample has no audio dependency today. Options: reference the published **`Shiny.Audio`** NuGet (its `IAudioSource` yields exactly 16 kHz/16-bit/mono PCM — ideal, but a cross-repo dep), or a MAUI mic plugin. Also needs a real ECAPA `.onnx` bundled at `Sample/Resources/Raw/ecapa.onnx`.
+- **No benchmarks** for voice (face has `Recognize` latency vs gallery size).
 
 ## Document scanning (`Shiny.DocumentIntelligence`)
 

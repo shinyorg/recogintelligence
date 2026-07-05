@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsAotCompatible>true</IsAotCompatible>
+        <Description>ONNX ECAPA-TDNN / x-vector speaker embedder for Shiny.VoiceIntelligence (Microsoft.ML.OnnxRuntime). Ships the iOS/MacCatalyst RegisterCustomOps linker workaround.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Flows the iOS/MacCatalyst RegisterCustomOps linker workaround into the consuming app head
+             (buildTransitive => applies even when this package is a transitive dependency). The target name
+             is suffixed _Voice so it coexists with Shiny.FaceIntelligence.Onnx's target in an app that
+             references both .Onnx packages (duplicate target names are an MSBuild error). -->
+        <None Include="build\Shiny.VoiceIntelligence.Onnx.targets" Pack="true" PackagePath="build;buildTransitive" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Shiny.VoiceIntelligence\Shiny.VoiceIntelligence.csproj" />
+    </ItemGroup>
+
+</Project>

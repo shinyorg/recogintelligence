@@ -1,0 +1,38 @@
+<Project>
+
+	<!--
+	  Microsoft.ML.OnnxRuntime's managed binding P/Invokes RegisterCustomOps, a symbol the
+	  desktop ONNX Runtime static lib does not define (it ships in onnxruntime-extensions).
+	  On iOS/MacCatalyst the .NET registrar force-references every P/Invoke target with a
+	  `-u` linker flag, so the app link fails with "Undefined symbols: _RegisterCustomOps".
+
+	  Shiny.VoiceIntelligence never registers custom ops, so the symbol is never called. This
+	  file (shipped in build/ + buildTransitive/) flows into the consuming app head and:
+	    1. allows the symbol to stay undefined (belt-and-suspenders for the force-loaded lib),
+	    2. drops it from @(ReferenceNativeSymbol) so the registrar's hard `-u` require - which
+	       -U cannot override on the Xcode 16+/26 linker - is never emitted.
+
+	  If a consumer DOES register custom ops (onnxruntime-extensions /
+	  RegisterCustomOpsUsingFunction), set DisableOnnxRegisterCustomOpsWorkaround=true.
+	  See: https://github.com/microsoft/onnxruntime/issues/24628
+
+	  NOTE: the property (DisableOnnxRegisterCustomOpsWorkaround) and the MtouchExtraArgs flag are
+	  intentionally identical to Shiny.FaceIntelligence.Onnx's targets — one toggle governs both, and
+	  the linker de-dupes the repeated `-U` flag. Only the Target NAME differs (suffixed _Voice) so the
+	  two packages can be imported into the same app head without an MSBuild duplicate-target error.
+	-->
+	<PropertyGroup Condition="'$(DisableOnnxRegisterCustomOpsWorkaround)' != 'true' And ($([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' Or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst')">
+		<MtouchExtraArgs>$(MtouchExtraArgs) -gcc_flags "-Wl,-U,_RegisterCustomOps"</MtouchExtraArgs>
+	</PropertyGroup>
+
+	<Target Name="_DropOnnxRegisterCustomOpsForcedSymbol_Voice"
+	        AfterTargets="_LoadLinkerOutput"
+	        BeforeTargets="_ComputeLinkNativeExecutableInputs"
+	        Condition="'$(DisableOnnxRegisterCustomOpsWorkaround)' != 'true' And ($([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' Or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst')">
+		<ItemGroup>
+			<_ProcessedReferenceNativeSymbol Remove="_RegisterCustomOps" />
+			<ReferenceNativeSymbol Remove="_RegisterCustomOps" />
+		</ItemGroup>
+	</Target>
+
+</Project>
