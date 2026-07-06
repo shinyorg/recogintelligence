@@ -3,15 +3,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Shiny;
 using Shiny.FaceIntelligence;
-using Sample.Pages;
 
-namespace Sample.ViewModels;
-
-/// <summary>One row per enrolled name (shots collapsed into a single entry).</summary>
-public record PersonRow(string Name, int Count, ImageSource? Thumb)
-{
-    public string CountText => this.Count == 1 ? "1 shot" : $"{this.Count} shots";
-}
+namespace Sample.Features.Face.Pages;
 
 [ShellMap<PeoplePage>("People", registerRoute: false)]
 public partial class PeopleViewModel(IFaceIntelligence recognizer, IDialogs dialogs) : ObservableObject, IPageLifecycleAware

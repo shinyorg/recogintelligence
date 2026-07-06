@@ -1,9 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Shiny;
 using Shiny.FaceIntelligence;
-using Sample.Pages;
 
-namespace Sample.ViewModels;
+namespace Sample.Features.Face.Pages;
 
 [ShellMap<EnrollPage>("Enroll", registerRoute: false)]
 public partial class EnrollViewModel(IFaceIntelligence recognizer) : ObservableObject

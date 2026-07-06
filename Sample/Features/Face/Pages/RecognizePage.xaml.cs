@@ -1,8 +1,7 @@
-using Sample.ViewModels;
 using Shiny.Maui.Controls.Camera;
 using Shiny.Maui.Controls.Camera.Face;
 
-namespace Sample.Pages;
+namespace Sample.Features.Face.Pages;
 
 // Camera hardware (permission/start/stop) and frame capture are view concerns and stay here.
 // All recognition logic lives in RecognizeViewModel, assigned as BindingContext by Shiny Shell.

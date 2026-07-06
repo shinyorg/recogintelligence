@@ -1,7 +1,7 @@
 using Shiny.FaceIntelligence;
 using Shiny.Maui.Controls.Camera.Face;
 
-namespace Sample;
+namespace Sample.Features.Face;
 
 static class FaceDetectionExtensions
 {

@@ -1,9 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Shiny;
 using Shiny.FaceIntelligence;
-using Sample.Pages;
 
-namespace Sample.ViewModels;
+namespace Sample.Features.Face.Pages;
 
 [ShellMap<RecognizePage>("Recognize", registerRoute: false)]
 public partial class RecognizeViewModel(IFaceIntelligence recognizer) : ObservableObject

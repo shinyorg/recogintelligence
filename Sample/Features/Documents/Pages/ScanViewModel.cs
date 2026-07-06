@@ -4,9 +4,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Shiny;
 using Shiny.DocumentIntelligence;
-using Sample.Pages;
 
-namespace Sample.ViewModels;
+namespace Sample.Features.Documents.Pages;
 
 [ShellMap<ScanPage>("Scan", registerRoute: false)]
 public partial class ScanViewModel(IDocumentScanner scanner, IDocumentExtractor extractor, IDialogs dialogs) : ObservableObject

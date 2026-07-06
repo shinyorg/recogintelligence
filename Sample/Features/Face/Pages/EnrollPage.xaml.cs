@@ -1,8 +1,7 @@
-using Sample.ViewModels;
 using Shiny.Maui.Controls.Camera;
 using Shiny.Maui.Controls.Camera.Face;
 
-namespace Sample.Pages;
+namespace Sample.Features.Face.Pages;
 
 // Camera hardware (permission/start/stop + capture) is a view concern and stays here.
 // Enrollment logic (embed + store) lives in EnrollViewModel.

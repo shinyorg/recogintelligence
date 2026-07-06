@@ -1,4 +1,4 @@
-namespace Sample.Pages;
+namespace Sample.Features.Face.Pages;
 
 // All logic lives in PeopleViewModel (assigned as BindingContext by Shiny Shell); the list,
 // status, and Forget command are bound in XAML.

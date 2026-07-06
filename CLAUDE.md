@@ -23,7 +23,7 @@ Note on naming: types/namespaces use **FaceIntelligence** as the product brand (
 | `src/Shiny.VoiceIntelligence.DocumentDb` | `net10.0` | `DocumentDbVoiceStore` + `UseDocumentDbStore(providerFactory)`. Provider-agnostic; deps: voice core + Shiny.DocumentDb. |
 | `src/Shiny.VoiceIntelligence.DocumentDb.Sqlite` | `net10.0` | Turnkey `UseSqliteStore` (sqlite-vec). Deps: voice `.DocumentDb` + Shiny.DocumentDb.Sqlite(.VectorSupport). |
 | `src/Shiny.DocumentIntelligence` | `net10.0;net10.0-android;net10.0-ios;net10.0-maccatalyst;net10.0-macos` | **Native document scanner**: `IDocumentScanner` + `AddDocumentIntelligence`. VisionKit (iOS/Catalyst), ML Kit (Android), Vision segmentation (macOS AppKit), throwing stub (bare net10.0). Dep: DI.Abstractions (+ ML Kit binding on Android only). See [Document scanning](#document-scanning-shinydocumentintelligence). |
-| `Sample` (repo root) | `net10.0-android;net10.0-ios` (`maccatalyst` commented out; `windows` only on a Windows host) | MAUI app, **MVVM via Shiny.Maui.Shell**: **Recognize**, **Enroll**, **People**, **Scan** tabs (page↔ViewModel maps, `ShinyShell`). Refs `.Onnx` + `.Sqlite` + `.DocumentIntelligence` (under `..\src\`) via `ProjectReference`. |
+| `Sample` (repo root) | `net10.0-android;net10.0-ios` (`maccatalyst` commented out; `windows` only on a Windows host) | MAUI app, **MVVM via Shiny.Maui.Shell**, organized **by feature** (`Features/{Face,Voice,Documents}/`), each with a per-feature `IMauiModule` (`Shiny.Extensions.MauiHosting` → `AddInfrastructureModules(...)`). Tabs: **Recognize/Enroll/People** (face) · **Voice ID/Voice Enroll/Speakers** (voice) · **Scan** (page↔ViewModel maps, `ShinyShell`). Refs face+voice `.Onnx` + `.Sqlite` + `.DocumentIntelligence` (under `..\src\`) via `ProjectReference`. See [Sample structure](#sample-structure-feature-folders). |
 
 **Repo layout**: shippable packages in `src/`, the demo app in `Sample/` at the root, tests/benchmarks in `tests/`. **Central Package Management** is on — all versions live in `Directory.Packages.props` (CPM), so `<PackageReference>` elements carry **no `Version=`**; add/bump versions there. `Directory.Build.props` hoists the shared `ImplicitUsings`/`Nullable` (per-project settings like `TargetFramework`, `IsAotCompatible`, `IsPackable` stay in each csproj). Note: with two feeds + CPM, restore emits `NU1507` (package-source-mapping advisory) — benign.
 
@@ -148,10 +148,26 @@ Plain voiceprint matching is **defeated by a recording or a voice clone** — tr
 2. **A countermeasure (CM) model** — an `ISpoofDetector` seam (bonafide-vs-spoof classifier: AASIST / RawNet2 / LCNN from ASVspoof, ONNX, same plumbing as the embedder). Passive net for synthetic audio; generalizes poorly to unseen attacks, so a filter not a wall.
 3. **Multimodal liveness** — this repo's real edge: combine **face liveness + the voice challenge** ("look at the camera and say 7-4-1-9"). Strong on-device gate that neither modality gives alone; an argument for keeping face + voice in one repo.
 
+### Voice in the Sample (built)
+
+Voice now has three Sample tabs — **Voice ID** (`VoiceRecognizePage`), **Voice Enroll** (`VoiceEnrollPage`), **Speakers** (`SpeakersPage`) — under `Sample/Features/Voice/` (see [Sample structure](#sample-structure-feature-folders)). They mirror the face pages but are **button-driven, not continuous** (you can't passively sample a voice), and record through mic capture instead of the camera.
+
+**Mic capture is vendored, not a package.** `Shiny.Audio` is *not* published to NuGet, so its capture impls were copied into the Sample rather than referenced: `Sample/Platforms/iOS/AppleAudioSource.cs` (`AVAudioEngine` tap) + `Sample/Platforms/Android/AndroidAudioSource.cs` (`AudioRecord`), both `public class … : IAudioSource` in namespace `Sample.Features.Voice.Audio` so `AddAudioCapture()` picks the right one per-TFM via `#if IOS/ANDROID` (a `NullAudioSource` stub covers MacCatalyst/Windows). **Format normalization is deliberate**: the shared `IAudioSource` contract yields **float32 mono** at the device's native rate (the vendored Apple source's `desiredFormat` was never applied — it taps at hardware rate), and **`VoiceRecorder` resamples to the 16 kHz** the embedder needs (Android is already 16 kHz → no-op; Apple ~48 kHz → linear resample). `VoiceRecorder.RecordAsync(TimeSpan)` is the single seam the pages use: it owns the **MAUI `Permissions.Microphone`** request, capture lifetime, and PCM→float→resample. Needs `NSMicrophoneUsageDescription` (iOS) + `RECORD_AUDIO` (Android), both added. Still needs a real ECAPA `.onnx` bundled at `Sample/Resources/Raw/ecapa.onnx` (gitignored, supplied per build, same as `arcface.onnx`); missing model surfaces as a "model missing" message on the voice pages, not a crash.
+
 ### Not yet built (voice)
 
-- **No Sample tab.** The face Sample has Recognize/Enroll/People tabs; voice has none yet. Blocked on one decision: **where mic capture comes from** — the recogintelligence Sample has no audio dependency today. Options: reference the published **`Shiny.Audio`** NuGet (its `IAudioSource` yields exactly 16 kHz/16-bit/mono PCM — ideal, but a cross-repo dep), or a MAUI mic plugin. Also needs a real ECAPA `.onnx` bundled at `Sample/Resources/Raw/ecapa.onnx`.
 - **No benchmarks** for voice (face has `Recognize` latency vs gallery size).
+
+## Sample structure (feature folders)
+
+The Sample is organized **by feature (vertical slices)**, mirroring `~/Desktop/dev/wonderland`, not by technical layer. Each `Features/<Domain>/` folder owns its pages+VMs (under `Pages/`) and a per-feature **`IMauiModule`** that registers its services:
+
+- `Features/Face/` — `FaceModule` (`AddFaceIntelligence`), `FaceDetectionExtensions`, `Pages/` (Recognize/Enroll/People + `PersonRow`). Namespace `Sample.Features.Face[.Pages]`.
+- `Features/Voice/` — `VoiceModule` (`AddVoiceIntelligence` + `AddAudioCapture`), `Audio/` (vendored `IAudioSource`/`PipeStream`/`VoiceRecorder`/`AudioCaptureRegistration`/`NullAudioSource`), `Pages/` (VoiceRecognize/VoiceEnroll/Speakers + `SpeakerRow`).
+- `Features/Documents/` — `DocumentsModule` (`AddDocumentIntelligence`), `Pages/` (Scan).
+- `Infrastructure/BundledAssets.cs` — `LoadBundledModel(...)` shared by the Face + Voice modules.
+
+`MauiProgram.cs` stays thin: `.UseShinyShell(...).UseShinyControls().UseShinyCamera().AddInfrastructureModules(new FaceModule(), new VoiceModule(), new DocumentsModule())`. `IMauiModule`/`AddInfrastructureModules` come from **`Shiny.Extensions.MauiHosting`** (5.1.2). VM↔Page maps still use `[ShellMap<TPage>("Route", registerRoute: false)]`; tab layout lives in `AppShell.xaml` with one `xmlns` alias per feature `.Pages` namespace. The `Sample.csproj` `<Import>`s **both** ONNX linker `.targets` (face + voice; the voice target name is `_Voice`-suffixed so they coexist — verified: both heads link clean).
 
 ## Document scanning (`Shiny.DocumentIntelligence`)
 

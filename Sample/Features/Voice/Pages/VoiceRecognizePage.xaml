@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Sample.Features.Voice.Pages"
+             x:Class="Sample.Features.Voice.Pages.VoiceRecognizePage"
+             x:DataType="vm:VoiceRecognizeViewModel"
+             Title="Voice Recognize">
+
+    <VerticalStackLayout Padding="24" Spacing="20" VerticalOptions="Center">
+        <Button Text="Record &amp; Identify"
+                Command="{Binding IdentifyCommand}"
+                IsEnabled="{Binding IsIdle}" />
+        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+        <Border Padding="16,12" BackgroundColor="#CC000000" StrokeShape="RoundRectangle 14">
+            <Label Text="{Binding ResultText}"
+                   TextColor="White"
+                   FontSize="18"
+                   HorizontalTextAlignment="Center" />
+        </Border>
+    </VerticalStackLayout>
+
+</ContentPage>

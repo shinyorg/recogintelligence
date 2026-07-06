@@ -30,5 +30,7 @@
 	<string>Assets.xcassets/appicon.appiconset</string>
 	<key>NSCameraUsageDescription</key>
 	<string>The camera is used to recognize faces and scan documents.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The microphone is used to enroll and recognize speakers by voice.</string>
 </dict>
 </plist>
