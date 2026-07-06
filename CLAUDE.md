@@ -27,6 +27,10 @@ Note on naming: types/namespaces use **FaceIntelligence** as the product brand (
 
 **Repo layout**: shippable packages in `src/`, the demo app in `Sample/` at the root, tests/benchmarks in `tests/`. **Central Package Management** is on — all versions live in `Directory.Packages.props` (CPM), so `<PackageReference>` elements carry **no `Version=`**; add/bump versions there. `Directory.Build.props` hoists the shared `ImplicitUsings`/`Nullable` (per-project settings like `TargetFramework`, `IsAotCompatible`, `IsPackable` stay in each csproj). Note: with two feeds + CPM, restore emits `NU1507` (package-source-mapping advisory) — benign.
 
+**Two version pins are deliberate (don't "update" them blindly)** — both are documented inline in `Directory.Packages.props`:
+- **`Microsoft.ML.OnnxRuntime` is held at `1.20.1`.** ORT `1.27.0` (and other newer revs) break the **Android** manifest merge with `AMM0000` "namespace used in multiple modules" (duplicate `com.google.*` namespaces) on the .NET Android 36.x manifest merger — the app won't build. iOS/tests are fine; the block is Android-only. Revisit when ORT ships an Android AAR compatible with the current merger.
+- **`Microsoft.Maui.Controls` is held at `10.0.71`** to match the prerelease **Shiny camera betas** (`Camera`/`Camera.Face` 0141, `Controls` 0121). Bumping MAUI (e.g. 10.0.80) and/or the camera betas (0142) shifts transitive AndroidX/play-services/firebase versions and re-triggers the same `AMM0000` Android breakage. Bump MAUI and the camera package **together**, and only after verifying the Android head. Everything else in CPM tracks latest stable (xunit v3 4.0 / BenchmarkDotNet 0.16 are prerelease-only, so those stay on latest stable too).
+
 ## Build & run
 
 ```bash
