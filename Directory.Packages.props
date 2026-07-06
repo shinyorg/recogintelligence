@@ -3,7 +3,7 @@
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     </PropertyGroup>
     <ItemGroup>
-        <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.0"/>
+        <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.20.1"/>
         <PackageVersion Include="SkiaSharp" Version="3.119.4"/>
         <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0"/>
         <PackageVersion Include="Shiny.DocumentDb" Version="10.0.0"/>
