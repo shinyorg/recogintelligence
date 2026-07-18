@@ -15,15 +15,12 @@
     </ContentPage.ToolbarItems>
 
     <Grid RowDefinitions="*,Auto">
+        <!-- Live preview only, for framing. No FaceAnalyzer: the face is found by the ONNX detector on the
+             captured still (in EnrollViewModel.Process), not by the camera's frame analysis. -->
         <cam:CameraView x:Name="Camera"
                         Grid.Row="0"
                         Facing="Front"
-                        ScaleMode="AspectFill">
-            <cam:FaceAnalyzer x:Name="FaceDetector"
-                              IsEnabled="True"
-                              ShowBoundingBox="True"
-                              FacesDetected="OnFacesDetected" />
-        </cam:CameraView>
+                        ScaleMode="AspectFill" />
 
         <VerticalStackLayout Grid.Row="1" Padding="16" Spacing="10">
             <Entry Text="{Binding Name}" Placeholder="Name" ReturnType="Done" />

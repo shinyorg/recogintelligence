@@ -21,6 +21,11 @@ public class FaceModule : IMauiModule
             // enroll/recognize. A missing model surfaces there (handled by the pages), not at startup.
             face.UseOnnxEmbedder(o => o.ModelBytesProvider = () => BundledAssets.LoadBundledModel("arcface.onnx"));
 
+            // UltraFace detector (face_detector.onnx, Resources/Raw) drives the no-box enrollment: ONNX finds
+            // the face on a single captured still and the manager rejects no/low-confidence/multiple/too-small
+            // faces — no camera frame analyzer needed. Also loaded lazily on first enroll.
+            face.UseOnnxDetector(o => o.ModelBytesProvider = () => BundledAssets.LoadBundledModel("face_detector.onnx"));
+
             face.UseSqliteStore(o =>
             {
                 o.ConnectionString = $"Data Source={Path.Combine(dataDir, "faces.db")}";

@@ -33,6 +33,17 @@ public static class FaceImaging
         return dest;
     }
 
+    /// <summary>
+    /// Read the pixel dimensions of an encoded image from its header only (no full decode). Used by the
+    /// manager to gate enrollment on the face box being a large-enough fraction of the frame.
+    /// </summary>
+    public static (int Width, int Height) GetDimensions(ReadOnlySpan<byte> imageData)
+    {
+        using var codec = SKCodec.Create(new MemoryStream(imageData.ToArray()))
+            ?? throw new InvalidOperationException("Could not read the captured image header.");
+        return (codec.Info.Width, codec.Info.Height);
+    }
+
     /// <summary>Crop the face and encode a small square JPEG thumbnail for display.</summary>
     public static byte[] EncodeThumbnail(ReadOnlySpan<byte> imageData, FaceBox face, int size = 128, int quality = 80)
     {

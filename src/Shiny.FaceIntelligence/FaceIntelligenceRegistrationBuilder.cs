@@ -39,4 +39,23 @@ public sealed class FaceIntelligenceRegistrationBuilder
         this.Services.AddSingleton(factory);
         return this;
     }
+
+    /// <summary>
+    /// Register a specific detector instance. Optional — only the no-box <c>Enroll</c>/<c>Recognize</c>
+    /// overloads use a detector; the box-based ones don't. Detector packages add friendlier extensions here
+    /// (e.g. <c>UseOnnxDetector</c>).
+    /// </summary>
+    public FaceIntelligenceRegistrationBuilder UseDetector(IFaceDetector detector)
+    {
+        ArgumentNullException.ThrowIfNull(detector);
+        return this.UseDetector(_ => detector);
+    }
+
+    /// <summary>Register a detector built from the service provider (lazy — runs on first resolve).</summary>
+    public FaceIntelligenceRegistrationBuilder UseDetector(Func<IServiceProvider, IFaceDetector> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        this.Services.AddSingleton(factory);
+        return this;
+    }
 }
