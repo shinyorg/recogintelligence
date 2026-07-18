@@ -4,12 +4,21 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
+    xmlns:home="clr-namespace:Sample.Features.Home.Pages"
     xmlns:face="clr-namespace:Sample.Features.Face.Pages"
     xmlns:voice="clr-namespace:Sample.Features.Voice.Pages"
     xmlns:docs="clr-namespace:Sample.Features.Documents.Pages"
+    FlyoutBehavior="Disabled"
     Title="Recognition Intelligence">
 
-    <TabBar>
+    <!-- Landing page: three buttons that jump into each area via absolute navigation. -->
+    <ShellContent
+        Title="Home"
+        ContentTemplate="{DataTemplate home:HomePage}"
+        Route="Home" />
+
+    <!-- Face Recognition area (tabs). -->
+    <TabBar Title="Face Recognition" Route="Face">
         <ShellContent
             Title="Recognize"
             ContentTemplate="{DataTemplate face:RecognizePage}"
@@ -22,22 +31,28 @@
             Title="People"
             ContentTemplate="{DataTemplate face:PeoplePage}"
             Route="People" />
+    </TabBar>
+
+    <!-- Voice Recognition area (tabs). -->
+    <TabBar Title="Voice Recognition" Route="Voice">
         <ShellContent
-            Title="Voice ID"
+            Title="Recognize"
             ContentTemplate="{DataTemplate voice:VoiceRecognizePage}"
             Route="VoiceRecognize" />
         <ShellContent
-            Title="Voice Enroll"
+            Title="Enroll"
             ContentTemplate="{DataTemplate voice:VoiceEnrollPage}"
             Route="VoiceEnroll" />
         <ShellContent
             Title="Speakers"
             ContentTemplate="{DataTemplate voice:SpeakersPage}"
             Route="Speakers" />
-        <ShellContent
-            Title="Scan"
-            ContentTemplate="{DataTemplate docs:ScanPage}"
-            Route="Scan" />
     </TabBar>
+
+    <!-- Scan Documents area (single page). -->
+    <ShellContent
+        Title="Scan"
+        ContentTemplate="{DataTemplate docs:ScanPage}"
+        Route="Scan" />
 
 </shiny:ShinyShell>

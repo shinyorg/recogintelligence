@@ -58,6 +58,36 @@ dotnet run --project tests/Shiny.FaceIntelligence.Benchmarks -c Release
 dotnet run --project tests/Shiny.FaceIntelligence.Benchmarks -c Release -- --job dry
 ```
 
+## Debugging the Sample on a physical iPhone (MAUI DevFlow)
+
+The Sample has **MAUI DevFlow** wired in so an agent can drive/inspect the running app (visual tree, logs, network, taps, screenshots). Registration is `builder.AddMauiDevFlowAgent()` in `MauiProgram.cs` inside `#if DEBUG`; package `Microsoft.Maui.DevFlow.Agent` in CPM, **pinned to the installed `maui` CLI version** (`maui devflow version` — mismatched CLI/agent versions won't connect). Standard MAUI app → no Blazor/GTK DevFlow packages.
+
+**Test device is the physical "ACR iPhone"** (iPhone 15 Pro, UDID `00008130-000E243E3AD1001C`), **not the simulator** — the app *crashes at launch on the iOS simulator* (`ArgumentNullException` via `ObjCRuntime.Runtime.RethrowManagedException`) but runs fine on-device.
+
+The connection recipe that actually works (each step matters — the obvious paths fail):
+
+```bash
+# 1. Build for the device RID. Do NOT use -t:Run here — mlaunch --installdev HANGS and installs nothing.
+dotnet build Sample/Sample.csproj -f net10.0-ios -p:RuntimeIdentifier=ios-arm64
+
+# 2. Install + launch with devicectl (reliable; gives real errors, unlike mlaunch).
+xcrun devicectl device install app --device 00008130-000E243E3AD1001C \
+  Sample/bin/Debug/net10.0-ios/ios-arm64/Sample.app
+xcrun devicectl device process launch --terminate-existing \
+  --device 00008130-000E243E3AD1001C org.shiny.recogiq
+
+# 3. Tunnel the in-app agent port over USB. The broker only auto-forwards for Android
+#    (its --device flag is an ADB serial); a physical iPhone needs iproxy (brew install libimobiledevice).
+iproxy 9223 9223 -u 00008130-000E243E3AD1001C &
+
+# 4. Drive it. Use --platform ios so the CLI talks to localhost:9223 (the tunnel).
+maui devflow agent status --platform ios      # => "running": true
+maui devflow ui tree --platform ios --depth 2
+maui devflow logs --platform ios
+```
+
+Notes: the tunnel (`iproxy`) must stay up for the whole session — relaunching the app or unplugging the phone drops it, just restart iproxy. `maui devflow list` stays `[]` (that's broker auto-discovery, which isn't used on this path); rely on `agent status --platform ios` instead. The **Android head does not build** (ORT/MAUI pin violations, see `Directory.Packages.props`), so device debugging is iOS-only for now.
+
 ## Tests & benchmarks
 
 `tests/` mirrors the sibling `~/Desktop/dev/DocumentDb` repo's conventions: **xUnit v3**, and the sqlite-vec native binary committed at `tests/runtimes/osx-arm64/native/vec0.dylib` (osx-arm64 only — CI must provision other RIDs). Three projects:
@@ -76,11 +106,20 @@ Key design points when extending:
 
 ## Architecture (the parts that span files)
 
+**Type/interface placement convention.** Namespaces are **flat** (folder ≠ namespace — e.g. everything in `Shiny.DocumentIntelligence/Extraction/` is `namespace Shiny.DocumentIntelligence`), so folders are purely organizational and moving a file between them is a same-namespace, zero-code change. Files are split by audience:
+  - **Root (+ topical folders like `Extraction/`)** — the **consumer-facing** surface: contracts you resolve and *invoke* (`IFaceIntelligence`, `IVoiceIntelligence`, `IDocumentScanner`, `IDocumentExtractor`), the registration builders/`Add*` extensions, options, and data/result types (`Person`, `Speaker`, `RecognitionResult`, `ExtractedDocument`, `Barcode`, …).
+  - **`Infrastructure/`** — the provider/platform **seam interfaces** that other packages *implement* and the library wires internally: `IFaceEmbedder`/`IFaceStore`, `ISpeakerEmbedder`/`IVoiceStore`, `ITextRecognizer`/`IBarcodeReader`.
+  - **`Internals/`** — concrete implementations and plumbing **not meant for external consumption**: the orchestrators (`FaceIntelligenceManager`, `VoiceIntelligenceManager`), `DocumentExtractor` + `Parsing/`, the source-gen `FacesJsonContext`/`VoicesJsonContext`, and the internal `FaceImaging` helper. (Some stay `public` only because a sibling package references them across assembly boundaries — e.g. `FacesJsonContext`, `FaceImaging`; the folder, not the modifier, marks intent. Platform impls stay under `Platforms/` — the csproj gates those per-TFM.)
+
+  New file? Ask: does the app **call** it (root) → **implement/plug** it (`Infrastructure/`) → or is it **internal machinery** (`Internals/`)?
+
 **The pipeline is composed via a builder.** `AddFaceIntelligence(this IServiceCollection, Action<FaceIntelligenceRegistrationBuilder>)` (`FaceIntelligenceServiceCollectionExtensions.cs`) runs the action, then registers `FaceIntelligenceOptions` + `IFaceIntelligence→FaceIntelligenceManager` and **validates** that an `IFaceEmbedder` and an `IFaceStore` were registered (else throws naming `UseOnnxEmbedder`/`UseSqliteStore`). The builder (`FaceIntelligenceRegistrationBuilder`) exposes `Options`, generic `UseEmbedder(...)`/`UseStore(...)` seams, and `Services`; the embedder/store packages add `UseOnnxEmbedder` / `UseDocumentDbStore` / `UseSqliteStore` extension methods on it.
 
 - **`IFaceEmbedder`** (image+box → L2-normalized vector). `Shiny.FaceIntelligence.Onnx.OnnxArcFaceEmbedder` is the default impl; `UseEmbedder(...)` plugs in a native one or a test fake.
 - **`IFaceStore`** (`IFaceStore.cs`: `Add`/`FindNearest`/`GetAll`/`RemoveByName`, returning `FaceMatch(Person, Distance)`) — the store seam. `DocumentDbFaceStore` (in `.DocumentDb`) is the default impl over `IDocumentStore`. **`FaceIntelligenceManager` depends only on `IFaceEmbedder` + `IFaceStore` + `FaceIntelligenceOptions`** — no ONNX, no DocumentDb in core.
-- **Vector dimension is read from the embedder**: `UseDocumentDbStore` registers `IDocumentStore` with a factory that resolves `IFaceEmbedder` and maps `Person.Embedding` via `MapVectorProperty<Person>(p => p.Embedding, embedder.Dimensions, Cosine)`, so it always matches the model.
+- **Vector dimension is read from the embedder**: `UseDocumentDbStore` builds the `IDocumentStore` inside the store, resolving `IFaceEmbedder` and mapping `Person.Embedding` via `MapVectorProperty<Person>(p => p.Embedding, embedder.Dimensions, Cosine)`, so it always matches the model.
+- **Each stack's `IDocumentStore` is PRIVATE — never registered in the container.** `UseDocumentDbStore` builds the `DocumentStore` and hands it straight to `DocumentDbFaceStore(IDocumentStore)`, registering only `IFaceStore`. This is deliberate: registering a shared `IDocumentStore` singleton breaks composition — an app using **both** face and voice (the Sample) would have two `IDocumentStore` registrations, and `GetRequiredService<IDocumentStore>()` returns the **last** one, so the face store would silently resolve the voice store (Speaker-mapped, `voices.db`) and vice versa. Regression-guarded by `tests/Shiny.RecognitionIntelligence.IntegrationTests` (registers both stacks, asserts no shared `IDocumentStore` leaks and the stores stay isolated).
+- **No lazy wrapper on the store (settled).** `DocumentDbFaceStore`/`DocumentDbVoiceStore` take a ready `IDocumentStore` — no `Lazy<>`/factory. It's safe to build `new DocumentStore(options)` eagerly at `IFaceStore` resolution because that ctor only creates the connection **object** + mapping metadata (all in-memory); `DocumentStore` opens the connection and loads the native vector extension (`vec0`) itself, lazily, on the **first** operation (`EnsureSharedConnectionInitializedAsync`). So the DB-open/vec0-load already lands inside the first enroll/recognize call where the pages catch it — an extra `Lazy` here would only re-defer something that was never eager.
 
 **Embedding** (`OnnxArcFaceEmbedder` + core `FaceImaging`): crop the face box (25% margin, clamped) → 112×112 RGB → normalize `(px - 127.5) / 128` → NCHW `[1,3,112,112]` → ONNX `Run` → **L2-normalize**. Dimension from the model's output metadata (falls back to 512 for a dynamic axis).
 

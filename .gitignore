@@ -402,3 +402,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# On-device model assets are supplied per build, not committed (see CLAUDE.md)
+Sample/Resources/Raw/*.onnx

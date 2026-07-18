@@ -8,4 +8,5 @@ namespace Shiny.FaceIntelligence;
 /// </summary>
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(Person))]
+[JsonSerializable(typeof(List<Person>))]
 public partial class FacesJsonContext : JsonSerializerContext;

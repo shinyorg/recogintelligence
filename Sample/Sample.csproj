@@ -1,85 +1,71 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-		<TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks>
-		<!--<TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>-->
-		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+    <PropertyGroup>
+        <TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks>
+        <!--<TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>-->
+        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
-		<!-- Note for MacCatalyst:
-		The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
-		When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
-		The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
-		either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
-		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+        <!-- Note for MacCatalyst:
+        The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
+        When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
+        The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
+        either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
+        <!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
 
-		<OutputType>Exe</OutputType>
-		<RootNamespace>Sample</RootNamespace>
-		<UseMaui>true</UseMaui>
-		<SingleProject>true</SingleProject>
-		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Sample</RootNamespace>
+        <UseMaui>true</UseMaui>
+        <SingleProject>true</SingleProject>
+        <MauiXamlInflator>SourceGen</MauiXamlInflator>
 
-		<ApplicationTitle>Shiny RecogIQ</ApplicationTitle>
-		<ApplicationId>org.shiny.recogiq</ApplicationId>
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+        <ApplicationTitle>Shiny RecogIQ</ApplicationTitle>
+        <ApplicationId>org.shiny.recogiq</ApplicationId>
+        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+        <ApplicationVersion>1</ApplicationVersion>
 
-		<WindowsPackageType>None</WindowsPackageType>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
-		<!-- Shiny.Maui.Controls.Camera.Face pulls Android ML Kit, which requires minSdk 23. -->
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">23.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
-		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+        <WindowsPackageType>None</WindowsPackageType>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">23.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+        <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+    </PropertyGroup>
 
-		<!-- Shiny.Maui.Shell 6.2.0 emits a false-positive SHINY002 ("AddGeneratedMaps will not be
-		     generated") even though AddGeneratedMaps IS generated and registers the page↔ViewModel
-		     maps. The warning fires regardless of ShinyMauiShell_GenerateNavExtensions. Suppress it. -->
-		<NoWarn>$(NoWarn);SHINY002</NoWarn>
-	</PropertyGroup>
+    <!-- ONNX Runtime iOS/MacCatalyst RegisterCustomOps linker workaround. The Sample uses a
+         ProjectReference, which does NOT consume the package's buildTransitive targets, so we
+         import the shipped file directly to exercise exactly what NuGet consumers receive. Both
+         ONNX packages ship one (the voice target name is suffixed _Voice so they coexist). -->
+    <Import Project="..\src\Shiny.FaceIntelligence.Onnx\build\Shiny.FaceIntelligence.Onnx.targets"/>
+    <Import Project="..\src\Shiny.VoiceIntelligence.Onnx\build\Shiny.VoiceIntelligence.Onnx.targets"/>
 
-	<!-- ONNX Runtime iOS/MacCatalyst RegisterCustomOps linker workaround. The Sample uses a
-	     ProjectReference, which does NOT consume the package's buildTransitive targets, so we
-	     import the shipped file directly to exercise exactly what NuGet consumers receive. Both
-	     ONNX packages ship one (the voice target name is suffixed _Voice so they coexist). -->
-	<Import Project="..\src\Shiny.FaceIntelligence.Onnx\build\Shiny.FaceIntelligence.Onnx.targets" />
-	<Import Project="..\src\Shiny.VoiceIntelligence.Onnx\build\Shiny.VoiceIntelligence.Onnx.targets" />
+    <ItemGroup>
+        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4"/>
+        <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128"/>
+        <MauiImage Include="Resources\Images\*"/>
+        <MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185"/>
+        <MauiFont Include="Resources\Fonts\*"/>
+        <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)"/>
+    </ItemGroup>
 
-	<ItemGroup>
-		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
-		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
-		<MauiImage Include="Resources\Images\*" />
-		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
-		<MauiFont Include="Resources\Fonts\*" />
-		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
-	</ItemGroup>
+    <ItemGroup>
+        <!-- Match the version the Shiny controls repo targets (avoids NU1605 downgrade). -->
+        <PackageReference Include="Microsoft.Maui.Controls"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug"/>
+    </ItemGroup>
 
-	<ItemGroup>
-		<!-- Match the version the Shiny controls repo targets (avoids NU1605 downgrade). -->
-		<PackageReference Include="Microsoft.Maui.Controls" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<!-- Face pipeline: ONNX embedder + SQLite (sqlite-vec) store. Both pull core + SkiaSharp transitively. -->
-		<ProjectReference Include="..\src\Shiny.FaceIntelligence.Onnx\Shiny.FaceIntelligence.Onnx.csproj" />
-		<ProjectReference Include="..\src\Shiny.FaceIntelligence.DocumentDb.Sqlite\Shiny.FaceIntelligence.DocumentDb.Sqlite.csproj" />
-
-		<!-- Voice pipeline: ONNX ECAPA embedder + SQLite (sqlite-vec) store. -->
-		<ProjectReference Include="..\src\Shiny.VoiceIntelligence.Onnx\Shiny.VoiceIntelligence.Onnx.csproj" />
-		<ProjectReference Include="..\src\Shiny.VoiceIntelligence.DocumentDb.Sqlite\Shiny.VoiceIntelligence.DocumentDb.Sqlite.csproj" />
-
-		<!-- Native document scanner (VisionKit on iOS, ML Kit on Android). -->
-		<ProjectReference Include="..\src\Shiny.DocumentIntelligence\Shiny.DocumentIntelligence.csproj" />
-
-		<!-- Shiny MAUI Shell (MVVM page maps + INavigator/IDialogs) + MVVM toolkit + per-feature modules -->
-		<PackageReference Include="Shiny.Maui.Shell" />
-		<PackageReference Include="Shiny.Extensions.MauiHosting" />
-		<PackageReference Include="CommunityToolkit.Mvvm" />
-
-		<!-- Shiny controls + camera + on-device face detection (prerelease) -->
-		<PackageReference Include="Shiny.Maui.Controls" />
-		<PackageReference Include="Shiny.Maui.Controls.Camera" />
-		<PackageReference Include="Shiny.Maui.Controls.Camera.Face" />
-	</ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\src\Shiny.FaceIntelligence.Onnx\Shiny.FaceIntelligence.Onnx.csproj"/>
+        <ProjectReference Include="..\src\Shiny.FaceIntelligence.DocumentDb.Sqlite\Shiny.FaceIntelligence.DocumentDb.Sqlite.csproj"/>
+        <ProjectReference Include="..\src\Shiny.VoiceIntelligence.Onnx\Shiny.VoiceIntelligence.Onnx.csproj"/>
+        <ProjectReference Include="..\src\Shiny.VoiceIntelligence.DocumentDb.Sqlite\Shiny.VoiceIntelligence.DocumentDb.Sqlite.csproj"/>
+        <ProjectReference Include="..\src\Shiny.DocumentIntelligence\Shiny.DocumentIntelligence.csproj"/>
+        <PackageReference Include="Shiny.Maui.Shell"/>
+        <PackageReference Include="Shiny.Extensions.MauiHosting"/>
+        <PackageReference Include="CommunityToolkit.Mvvm"/>
+        <PackageReference Include="Shiny.Maui.Controls"/>
+        <PackageReference Include="Shiny.Maui.Controls.Camera"/>
+        <PackageReference Include="Shiny.Maui.Controls.Camera.Face"/>
+        <PackageReference Include="Microsoft.Maui.DevFlow.Agent"/>
+    </ItemGroup>
 
 </Project>

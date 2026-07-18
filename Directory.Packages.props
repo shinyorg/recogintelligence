@@ -1,42 +1,34 @@
 <Project>
-  <PropertyGroup>
-    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-  </PropertyGroup>
-  <ItemGroup>
-    <!-- Pinned to 1.20.1: ORT 1.27.0's Android AAR breaks the .NET Android 36.x manifest merge with
-             AMM0000 "namespace used in multiple modules" (duplicate com.google.* namespaces). Revisit when
-             ORT ships an Android package compatible with the current manifest merger. -->
-    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.0" />
-    <PackageVersion Include="SkiaSharp" Version="4.148.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
-    <PackageVersion Include="Shiny.DocumentDb" Version="11.0.0" />
-    <PackageVersion Include="Shiny.DocumentDb.Sqlite" Version="11.0.0" />
-    <PackageVersion Include="Shiny.DocumentDb.Sqlite.VectorSupport" Version="11.0.0" />
-    <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.2" />
-    <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.Text.Recognition" Version="119.0.1.7" />
-    <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.7" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- MAUI stays pinned to 10.0.71 to match the prerelease Shiny camera betas (0141/0121). Bumping
-             MAUI (10.0.80) and/or the camera betas (0142) shifts transitive AndroidX/play-services/firebase
-             versions and breaks the Android manifest merge with AMM0000 duplicate-namespace errors. Bump
-             MAUI and the camera package together, and only after verifying the Android head. -->
-    <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.80" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
-    <PackageVersion Include="Shiny.Maui.Shell" Version="6.3.2" />
-    <PackageVersion Include="Shiny.Extensions.MauiHosting" Version="5.1.2" />
-    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageVersion Include="Shiny.Maui.Controls" Version="1.0.1-beta-0121" />
-    <PackageVersion Include="Shiny.Maui.Controls.Camera" Version="1.0.1-beta-0141" />
-    <PackageVersion Include="Shiny.Maui.Controls.Camera.Face" Version="1.0.1-beta-0141" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
-    <!-- xunit.v3 4.0 / xunit.runner.visualstudio 4.0 / BenchmarkDotNet 0.16 are prerelease-only —
-             stay on the latest stable of each. -->
-    <PackageVersion Include="xunit.v3" Version="3.2.2" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
-  </ItemGroup>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.1"/>
+        <PackageVersion Include="SkiaSharp" Version="4.150.1"/>
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10"/>
+        <PackageVersion Include="Shiny.DocumentDb" Version="11.1.0"/>
+        <PackageVersion Include="Shiny.DocumentDb.Sqlite" Version="11.1.0"/>
+        <PackageVersion Include="Shiny.DocumentDb.Sqlite.VectorSupport" Version="11.1.0"/>
+        <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.2"/>
+        <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.Text.Recognition" Version="119.0.1.7"/>
+        <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.7"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.80"/>
+        <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10"/>
+        <PackageVersion Include="Shiny.Maui.Shell" Version="6.3.2"/>
+        <PackageVersion Include="Shiny.Extensions.MauiHosting" Version="5.1.4"/>
+        <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2"/>
+        <PackageVersion Include="Shiny.Maui.Controls" Version="1.0.1-beta-0146"/>
+        <PackageVersion Include="Shiny.Maui.Controls.Camera" Version="1.0.1-beta-0146"/>
+        <PackageVersion Include="Shiny.Maui.Controls.Camera.Face" Version="1.0.1-beta-0146"/>
+        <PackageVersion Include="Microsoft.Maui.DevFlow.Agent" Version="0.1.0-preview.12.26358.3"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10"/>
+        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1"/>
+        <PackageVersion Include="xunit.v3" Version="3.2.2"/>
+        <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5"/>
+        <PackageVersion Include="BenchmarkDotNet" Version="0.15.8"/>
+    </ItemGroup>
 </Project>

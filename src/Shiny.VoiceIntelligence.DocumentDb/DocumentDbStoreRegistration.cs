@@ -16,7 +16,11 @@ public static class DocumentDbStoreRegistration
     {
         ArgumentNullException.ThrowIfNull(databaseProviderFactory);
 
-        builder.Services.AddSingleton<IDocumentStore>(sp =>
+        // The IDocumentStore is PRIVATE to this voice store — it is NOT registered in the container.
+        // Registering a shared IDocumentStore would collide with any other DocumentDb store in the same
+        // app (e.g. the face stack): GetRequiredService<IDocumentStore> returns the last registration,
+        // so voices would end up writing to whichever store registered last. Each stack owns its own.
+        return builder.UseStore(sp =>
         {
             var embedder = sp.GetRequiredService<ISpeakerEmbedder>();
             var options = new DocumentStoreOptions
@@ -27,12 +31,11 @@ public static class DocumentDbStoreRegistration
             };
             // Vector dimension must match the model's output (read from the embedder).
             options.MapVectorProperty<Speaker>(p => p.Embedding, embedder.Dimensions, VectorDistance.Cosine);
-            return new DocumentStore(options);
-        });
 
-        // Resolve IDocumentStore lazily so building it (which may open the DB and load the native vector
-        // extension, e.g. vec0) happens on the first enroll/recognize, not while DI constructs the store.
-        return builder.UseStore(sp =>
-            new DocumentDbVoiceStore(new Lazy<IDocumentStore>(sp.GetRequiredService<IDocumentStore>)));
+            // Build eagerly — cheap. new DocumentStore only creates the connection object + mapping
+            // metadata; the DB connection + vec0 load are deferred by DocumentStore to the first
+            // operation (inside enroll/recognize), which is where the pages catch any failure.
+            return new DocumentDbVoiceStore(new DocumentStore(options));
+        });
     }
 }

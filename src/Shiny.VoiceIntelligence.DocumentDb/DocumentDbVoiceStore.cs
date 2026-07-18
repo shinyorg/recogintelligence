@@ -8,25 +8,20 @@ namespace Shiny.VoiceIntelligence.DocumentDb;
 /// vector sidecar; recognition reads it back via <c>NearestVectors</c>. Mirrors <c>DocumentDbFaceStore</c>.
 /// </summary>
 /// <remarks>
-/// The underlying <see cref="IDocumentStore"/> is resolved <b>lazily</b>: building it can open a database
-/// connection and load a native vector extension (e.g. sqlite-vec's <c>vec0</c>), which would otherwise throw
-/// while the DI container constructs this store — i.e. during ViewModel construction, a launch/navigation
-/// crash. Deferring to the first store operation moves any such failure into an enroll/recognize call where
-/// the pages catch it. Mirrors the lazy model load in <c>OnnxEcapaEmbedder</c>.
+/// The <see cref="IDocumentStore"/> is passed in fully constructed — cheap and safe to build eagerly,
+/// because <c>new DocumentStore(...)</c> only creates the connection object and resolves mapping metadata.
+/// Opening the connection and loading the native vector extension (e.g. sqlite-vec's <c>vec0</c>) is
+/// deferred by the store <b>itself</b> to the first operation — i.e. inside an enroll/recognize call where
+/// the pages catch any failure — so this adapter needs no laziness of its own.
 /// </remarks>
-public class DocumentDbVoiceStore(Lazy<IDocumentStore> store) : IVoiceStore
+public class DocumentDbVoiceStore(IDocumentStore store) : IVoiceStore
 {
-    /// <summary>Convenience for direct (non-lazy) construction, e.g. server-side where eager init is fine.</summary>
-    public DocumentDbVoiceStore(IDocumentStore store) : this(new Lazy<IDocumentStore>(() => store)) { }
-
-    IDocumentStore Store => store.Value;
-
     public Task Add(Speaker speaker, CancellationToken ct = default)
-        => this.Store.Insert(speaker, cancellationToken: ct);
+        => store.Insert(speaker, cancellationToken: ct);
 
     public async Task<IReadOnlyList<VoiceMatch>> FindNearest(ReadOnlyMemory<float> embedding, int count, CancellationToken ct = default)
     {
-        var hits = await this.Store.NearestVectors<Speaker>(embedding, count, cancellationToken: ct);
+        var hits = await store.NearestVectors<Speaker>(embedding, count, cancellationToken: ct);
         var matches = new List<VoiceMatch>(hits.Count);
         foreach (var hit in hits)
             matches.Add(new VoiceMatch(hit.Document, hit.Score));
@@ -34,8 +29,8 @@ public class DocumentDbVoiceStore(Lazy<IDocumentStore> store) : IVoiceStore
     }
 
     public Task<IReadOnlyList<Speaker>> GetAll(CancellationToken ct = default)
-        => this.Store.Query<Speaker>().OrderByDescending(p => p.EnrolledAt).ToList(ct);
+        => store.Query<Speaker>().OrderByDescending(p => p.EnrolledAt).ToList(ct);
 
     public Task<int> RemoveByName(string name, CancellationToken ct = default)
-        => this.Store.Query<Speaker>().Where(p => p.Name == name).ExecuteDelete(ct);
+        => store.Query<Speaker>().Where(p => p.Name == name).ExecuteDelete(ct);
 }

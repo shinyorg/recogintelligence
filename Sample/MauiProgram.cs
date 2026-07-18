@@ -3,6 +3,9 @@ using Sample.Features.Documents;
 using Sample.Features.Face;
 using Sample.Features.Voice;
 using Shiny;
+#if DEBUG
+using Microsoft.Maui.DevFlow.Agent;
+#endif
 
 namespace Sample;
 
@@ -29,6 +32,7 @@ public static class MauiProgram
 
 #if DEBUG
         builder.Logging.AddDebug();
+        builder.AddMauiDevFlowAgent();
 #endif
         return builder.Build();
     }

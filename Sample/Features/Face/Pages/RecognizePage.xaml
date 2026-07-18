@@ -2,10 +2,17 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:cam="http://shiny.net/maui/camera"
+             xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
              xmlns:vm="clr-namespace:Sample.Features.Face.Pages"
              x:Class="Sample.Features.Face.Pages.RecognizePage"
              x:DataType="vm:RecognizeViewModel"
              Title="Recognize">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Home"
+                     shiny:Navigate.Route="Home"
+                     shiny:Navigate.RelativeNavigation="False" />
+    </ContentPage.ToolbarItems>
 
     <Grid>
         <!-- Live preview. The FaceAnalyzer detects faces on-device; we capture a still ourselves off

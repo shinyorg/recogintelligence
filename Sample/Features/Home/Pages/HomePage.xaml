@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Sample.Features.Home.Pages"
+             x:Class="Sample.Features.Home.Pages.HomePage"
+             x:DataType="vm:HomeViewModel"
+             Title="Recognition Intelligence">
+
+    <Grid RowDefinitions="*,Auto,*" Padding="24">
+        <VerticalStackLayout Grid.Row="1" Spacing="16" VerticalOptions="Center">
+
+            <Label Text="Recognition Intelligence"
+                   Style="{StaticResource Headline}"
+                   HorizontalTextAlignment="Center" />
+
+            <Label Text="Choose an area"
+                   Style="{StaticResource SubHeadline}"
+                   HorizontalTextAlignment="Center"
+                   Margin="0,0,0,12" />
+
+            <Button Text="Face Recognition"
+                    Command="{Binding FaceCommand}"
+                    HeightRequest="56" />
+
+            <Button Text="Voice Recognition"
+                    Command="{Binding VoiceCommand}"
+                    HeightRequest="56" />
+
+            <Button Text="Scan Documents"
+                    Command="{Binding ScanCommand}"
+                    HeightRequest="56" />
+
+        </VerticalStackLayout>
+    </Grid>
+
+</ContentPage>
