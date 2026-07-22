@@ -397,6 +397,8 @@ The Sample is organized **by feature (vertical slices)**, mirroring `~/Desktop/d
 - `Features/Documents/` — `DocumentsModule` (`AddDocumentIntelligence`), `Pages/` (Scan).
 - `Infrastructure/BundledAssets.cs` — `LoadBundledModel(...)` shared by the Face + Voice modules.
 
+**Branding**: the app icon and splash are the Shiny mark, copied from `~/Desktop/dev/shiny/art/` (`appicon.png`, `appiconfg.png`, `splash.png` — all the same source image) and declared exactly as the Shiny sample does: `<MauiIcon Include="Resources\AppIcon\appicon.png" ForegroundFile="...appiconfg.png"/>` with **no `Color`** (the artwork carries its own background) and `<MauiSplashScreen ... Color="#0B0E17" BaseSize="200,200"/>`. The .NET template SVGs were removed. Note the resizetizer does **not** clean up after a changed `BaseSize` — a stale `splash_<hash>` set at the old size lingers in `bin/`, so `rm -rf Sample/bin/Debug/net10.0-ios Sample/obj/Debug/net10.0-ios` after changing icon/splash inputs if you want to confirm what actually ships.
+
 `MauiProgram.cs` stays thin: `.UseShinyShell(...).UseShinyControls().UseShinyCamera().AddInfrastructureModules(new FaceModule(), new VoiceModule(), new DocumentsModule())`. `IMauiModule`/`AddInfrastructureModules` come from **`Shiny.Extensions.MauiHosting`** (5.1.2). VM↔Page maps still use `[ShellMap<TPage>("Route", registerRoute: false)]`; tab layout lives in `AppShell.xaml` with one `xmlns` alias per feature `.Pages` namespace. The `Sample.csproj` `<Import>`s **both** ONNX linker `.targets` (face + voice; the voice target name is `_Voice`-suffixed so they coexist — verified: both heads link clean).
 
 ## Document scanning (`Shiny.DocumentIntelligence`)
