@@ -106,7 +106,10 @@ public class FaceIntelligenceManager(
 
         var best = hits[0];
         if (best.Distance > options.MaxDistance)
-            return RecognitionResult.NoMatch;
+            // A near miss and a total stranger are both "no match", but they mean completely different
+            // things when tuning MaxDistance — so report how close the nearest actually got. Name stays
+            // null, so IsMatch is still false and callers that only check IsMatch are unaffected.
+            return new RecognitionResult(null, best.Distance, null);
 
         return new RecognitionResult(best.Person.Name, best.Distance, best.Person.Id);
     }

@@ -18,8 +18,9 @@ Note on naming: types/namespaces use **FaceIntelligence** as the product brand (
 | `src/Shiny.FaceIntelligence.Onnx` | `net10.0` | `OnnxArcFaceEmbedder` + `UseOnnxEmbedder`. Deps: core + Microsoft.ML.OnnxRuntime. **Ships the iOS linker targets.** |
 | `src/Shiny.FaceIntelligence.DocumentDb` | `net10.0` | `DocumentDbFaceStore` + `UseDocumentDbStore(providerFactory)`. Provider-agnostic; deps: core + Shiny.DocumentDb (abstractions). |
 | `src/Shiny.FaceIntelligence.DocumentDb.Sqlite` | `net10.0` | Turnkey `UseSqliteStore` (sqlite-vec). Deps: `.DocumentDb` + Shiny.DocumentDb.Sqlite. |
-| `src/Shiny.VoiceIntelligence` | `net10.0` | **Core** (voice): contracts (`ISpeakerEmbedder`, `IVoiceStore`, `IVoiceIntelligence`), `Speaker`, `RecognitionResult`, `VoiceMatch`, `VoiceIntelligenceManager`, `VoiceIntelligenceRegistrationBuilder` + `AddVoiceIntelligence`. Deps: **DI.Abstractions only** (no SkiaSharp — audio has no image stage). **No ONNX, no DocumentDb, no audio capture.** |
-| `src/Shiny.VoiceIntelligence.Onnx` | `net10.0` | `OnnxEcapaEmbedder` + `UseOnnxEmbedder`. Deps: voice core + Microsoft.ML.OnnxRuntime. **Ships the iOS linker targets** (target name suffixed `_Voice` so it coexists with the face `.Onnx` targets — see below). |
+| `src/Shiny.FaceIntelligence.Maui` | `net10.0-android;net10.0-ios;net10.0-maccatalyst` | **Live face controls**: `FaceRecognitionView` (continuous identify) + `FaceEnrollmentView` (guided multi-shot wizard), `FaceRecognitionAnalyzer : FrameAnalyzer`, `AnalyzedFace`/`FaceRecognizedEventArgs`/`FaceEnrollmentStep`, `FrameQuality`, plus the per-platform `CameraFrame`→upright-RGB bridge. Deps: face core + Shiny.Maui.Controls.Camera. Multi-targeted because the frame arrives as a native buffer per OS. See [Live recognition](#live-recognition-the-frame-analyzer-shinyfaceintelligencemaui). |
+| `src/Shiny.VoiceIntelligence` | `net10.0` | **Core** (voice): contracts (`ISpeakerEmbedder`, `IVoiceStore`, `IVoiceIntelligence`), `Speaker`, `RecognitionResult`, `VoiceMatch`, `VoiceIntelligenceManager`, the guided-enrollment wizard (`VoiceEnrollmentSession` + `VoiceEnrollmentOptions`/`VoiceQuality`), `VoiceIntelligenceRegistrationBuilder` + `AddVoiceIntelligence`. Deps: **DI.Abstractions only** (no SkiaSharp — audio has no image stage). **No ONNX, no DocumentDb, no audio capture.** |
+| `src/Shiny.VoiceIntelligence.Onnx` | `net10.0` | `OnnxEcapaEmbedder` (waveform **and** fbank models, auto-detected) + `KaldiFbank` + `UseOnnxEmbedder`. Deps: voice core + Microsoft.ML.OnnxRuntime. **Ships the iOS linker targets** (target name suffixed `_Voice` so it coexists with the face `.Onnx` targets — see below). |
 | `src/Shiny.VoiceIntelligence.DocumentDb` | `net10.0` | `DocumentDbVoiceStore` + `UseDocumentDbStore(providerFactory)`. Provider-agnostic; deps: voice core + Shiny.DocumentDb. |
 | `src/Shiny.VoiceIntelligence.DocumentDb.Sqlite` | `net10.0` | Turnkey `UseSqliteStore` (sqlite-vec). Deps: voice `.DocumentDb` + Shiny.DocumentDb.Sqlite(.VectorSupport). |
 | `src/Shiny.DocumentIntelligence` | `net10.0;net10.0-android;net10.0-ios;net10.0-maccatalyst;net10.0-macos` | **Native document scanner**: `IDocumentScanner` + `AddDocumentIntelligence`. VisionKit (iOS/Catalyst), ML Kit (Android), Vision segmentation (macOS AppKit), throwing stub (bare net10.0). Dep: DI.Abstractions (+ ML Kit binding on Android only). See [Document scanning](#document-scanning-shinydocumentintelligence). |
@@ -95,7 +96,7 @@ Notes: the tunnel (`iproxy`) must stay up for the whole session — relaunching 
 - `Shiny.FaceIntelligence.TestKit` — shared, no test deps: `FakeEmbedder` (deterministic `IFaceEmbedder`), `TestFaces`, `Vec0Locator`.
 - `Shiny.FaceIntelligence.Tests` — E2E. Builds an `IFaceIntelligence` through the **real builder wiring** (`AddFaceIntelligence(face => { face.UseEmbedder(new FakeEmbedder(dim)); face.UseSqliteStore(...); })`) against the **real sqlite-vec store** (file-backed temp DB), fake embedder for controlled geometry. Refs core + `.Sqlite` + TestKit (no ONNX). Covers match/no-match, the cosine-distance threshold (confirms sqlite-vec's `0 = identical` convention the code relies on), multi-shot nearest-neighbor, the name-as-identity conflation (the TODO), `Forget`/`GetAll`, and that the vector dimension is read from the embedder.
 - `Shiny.FaceIntelligence.Benchmarks` — BenchmarkDotNet; `Recognize` latency vs gallery size (100/1k/10k) at the real 512-d width.
-- `Shiny.VoiceIntelligence.TestKit` / `Shiny.VoiceIntelligence.Tests` — the voice twins. Same shape (`AddVoiceIntelligence(voice => { voice.UseEmbedder(new FakeSpeakerEmbedder(dim)); voice.UseSqliteStore(...); })` against the real sqlite-vec store), and they **share the same committed `tests/runtimes/.../vec0` binary**. 10 tests, all passing: match/no-match, empty store, cosine-distance geometry, threshold enforcement, multi-utterance nearest-neighbor, `Forget`/`GetAll`, and a 192-d dimension round-trip. **No fake-image trick needed** (see below) — the voice manager does no decode, so `FakeSpeakerEmbedder` reads the sample buffer directly as the vector and `TestVoices.Utterance(...)` just hands a vector in.
+- `Shiny.VoiceIntelligence.TestKit` / `Shiny.VoiceIntelligence.Tests` — the voice twins. Same shape (`AddVoiceIntelligence(voice => { voice.UseEmbedder(new FakeSpeakerEmbedder(dim)); voice.UseSqliteStore(...); })` against the real sqlite-vec store), and they **share the same committed `tests/runtimes/.../vec0` binary**. 29 tests, all passing: match/no-match, empty store, cosine-distance geometry, threshold enforcement, multi-utterance nearest-neighbor, `Forget`/`GetAll`, a 192-d dimension round-trip, `KaldiFbankTests`, plus the guided wizard (`VoiceEnrollmentSessionTests` — completion, nothing-stored-until-done, outlier rejection, bad-first-clip rescue, give-up-and-prune) and `VoiceQualityTests` (synthesized tone/silence/noise/clipping). **No fake-image trick needed** (see below) — the voice manager does no decode, so `FakeSpeakerEmbedder` reads the sample buffer directly as the vector and `TestVoices.Utterance(...)` just hands a vector in.
 
 Key design points when extending:
 - **The fake-image trick**: `FaceIntelligenceManager.Enroll` decodes the image with SkiaSharp for its thumbnail, independent of the embedder. So `TestFaces.Image(...)` produces a *real* PNG with the embedding appended as a trailing payload — Skia decodes the PNG, `FakeEmbedder` reads the trailing block. Don't pass raw float buffers as "images"; enrollment will throw on decode.
@@ -125,19 +126,96 @@ Key design points when extending:
 
 **Storage / matching** (`FaceIntelligenceManager`, `Person`, `DocumentDbFaceStore`): each `Enroll` is **one `Person` document = one shot** (fresh GUID). `Person.Embedding` is `[JsonIgnore]`d — it lives **only in the sqlite-vec sidecar table**, never the JSON blob, and comes back empty from document queries. `Recognize` calls `store.FindNearest(query, CandidateCount)` and returns **only the single nearest** `FaceMatch` if its `Distance` is within `MaxDistance`, else `NoMatch`. `CandidateCount` (default 5) only widens the internal candidate pull; the result is always one name or none.
 
-**Detection: two paths (deliberate).** ArcFace is an **embedder**, not a detector — it always returns a vector for whatever `FaceBox` it's handed and never reports "bad face." So a face box must come from somewhere. There are two ways, both supported:
-- **In-library ONNX detector (`IFaceDetector`, used by enrollment).** `Shiny.FaceIntelligence.IFaceDetector` (Infrastructure seam) → `Onnx.OnnxUltraFaceDetector` (UltraFace RFB-320: resize → `(px-127)/128` → NCHW → scores`[1,N,2]`+boxes`[1,N,4]` → threshold + NMS → pixel `FaceBox`es with confidence). Registered via `UseOnnxDetector(...)`/`UseDetector(...)` — **optional**; the manager takes `IEnumerable<IFaceDetector>` and only the **no-box** overloads use it. `FaceIntelligenceManager.Enroll(name, imageData, allowDuplicate=false)` and `Recognize(imageData)` run the detector, then apply the gates in `FaceIntelligenceOptions` (`MinDetectionConfidence`, `MinFaceSizeFraction`, `RejectMultipleFaces`, `GateEnrollmentOnRecognition`) and throw `FaceDetectionException{Reason: NoFace|LowConfidence|MultipleFaces|TooSmall}` or `FaceEnrollmentConflictException(match)` (the duplicate/mismatch gate — re-call with `allowDuplicate:true` to force). This is what the Sample's **Enroll** page now uses: one still capture on tap → ONNX detects + gates → embed. **No camera frame analyzer.** (Core's `DetectedFace{Box,Confidence}` is distinct from the camera's `Shiny.Maui.Controls.Camera.Face.DetectedFace`; the Sample aliases the camera one as `CameraFace` in `FaceDetectionExtensions.cs`.)
-- **Camera frame analyzer (still used by the Recognize page).** `Shiny.Maui.Controls.Camera.Face`'s `FaceAnalyzer` raises `FacesDetected(FacesDetectedEventArgs)` per frame; the Sample (`FaceDetectionExtensions.cs`) picks the `Largest()` camera face and maps its `Bounds` to a Core `FaceBox`, then calls the **box-based** `Recognize(imageData, box)`. The box-based `Enroll`/`Recognize` overloads need no detector and are unchanged.
+**Detection: one detector, two entry points.** ArcFace is an **embedder**, not a detector — it always returns a vector for whatever `FaceBox` it's handed and never reports "bad face." So a face box must come from somewhere, and since 2026-07-22 that is **always** `IFaceDetector` (the in-library ONNX detector). `Shiny.FaceIntelligence.IFaceDetector` (Infrastructure seam) → `Onnx.OnnxUltraFaceDetector` (UltraFace RFB-320: resize → `(px-127)/128` → NCHW → scores`[1,N,2]`+boxes`[1,N,4]` → threshold + NMS → pixel `FaceBox`es with confidence). Registered via `UseOnnxDetector(...)`/`UseDetector(...)` — **optional** for the box-based overloads; the manager takes `IEnumerable<IFaceDetector>` and only the **no-box** overloads use it, but `FaceRecognitionAnalyzer` requires it outright.
+- **Enrollment** goes through `FaceCameraView.EnrollAsync` (the box-based `Enroll(name, imageData, face)` overload on the analyzed frame — no re-detect, so the crop matches recognition byte for byte). The no-box `Enroll(name, imageData, allowDuplicate=false)` overload still exists for server-side/still workflows: it runs the detector and applies the gates in `FaceIntelligenceOptions` (`MinDetectionConfidence`, `MinFaceSizeFraction`, `RejectMultipleFaces`, `GateEnrollmentOnRecognition`), throwing `FaceDetectionException{Reason: NoFace|LowConfidence|MultipleFaces|TooSmall}` or `FaceEnrollmentConflictException(match)` (re-call with `allowDuplicate:true` to force).
+- **Recognition** runs the same detector per *frame* inside `FaceRecognitionAnalyzer` — see below. No still capture at all.
 
-**iOS capture gotcha (camera beta `1.0.1-beta-0121`):** the declarative `CaptureOnDetection="True"` → `CameraView.DetectionCaptured` path **never fires on iOS** in this beta (Vision detection itself works — `FacesDetected` fires and the preview is live). So the **Recognize** page drives capture itself: subscribe to `FaceAnalyzer.FacesDetected`, and continuously call `CameraView.CapturePhotoAsync()` and pass `photo.Data` + the scaled box to the VM. (The **Enroll** page no longer uses `FacesDetected` at all — it captures one still on the button tap and lets the in-library ONNX detector find + gate the face; see the two-path detection note above.) A page-level `capturing` bool guards against the per-frame event re-entering while a capture/enroll is in flight. If a future camera build fixes `DetectionCaptured`, the declarative path is simpler — but verify on-device before switching back. **`DetectedFace.Bounds` are normalized `0..1`** (upright image space), but `FaceBox` is in **pixels** — so `ToFaceBox(photo.Width, photo.Height)` scales by the captured photo's pixel dimensions. (Passing the normalized values straight through crops a sub-pixel sliver and the face is effectively never found.) The library's contract is "give me the photo bytes + a pixel `FaceBox`."
+**The camera-side `FaceAnalyzer` is gone (settled).** The Sample used to reference `Shiny.Maui.Controls.Camera.Face`, subscribe to `FacesDetected`, and call `CapturePhotoAsync()` per detection. That is removed — package reference, `FaceDetectionExtensions.cs`, and all of it. It meant two detectors (Vision *and* ours), two coordinate spaces (the camera's normalized `0..1` bounds vs. the library's pixel `FaceBox`), a full still capture per detected frame, and a `capturing` re-entrancy guard that latched forever if a capture ever wedged. `FaceRecognitionAnalyzer` replaces the whole arrangement with one detector in one coordinate space and no capture. Don't reintroduce the camera Face package for recognition.
 
 **JSON / AOT**: all packages are `IsAotCompatible`. `FacesJsonContext` (in **core**) is the source-generated `JsonSerializerContext` for `Person`; `UseDocumentDbStore` feeds `FacesJsonContext.Default.Options` to the store for serialization + the LINQ expression visitor. Do **not** add another `[JsonSerializerContext]` — it's inherited. New persisted document types must be added as `[JsonSerializable]` here.
 
+## Live recognition: the frame analyzer (`Shiny.FaceIntelligence.Maui`)
+
+Recognition runs against **live camera frames**. There is no still capture anywhere in the face feature — enroll and recognize both read the analyzed frame.
+
+**`FaceRecognitionView` / `FaceEnrollmentView` are the APIs consumers should use** — see [Two controls](#two-controls-recognize-vs-enroll). They wrap `CameraView` + permission + start/stop lifecycle + the analyzer and resolve services from `Handler.MauiContext.Services`, so there is nothing to inject or wire:
+
+```xml
+<fi:FaceRecognitionView FaceRecognized="OnFaceRecognized" CameraFailed="OnCameraFailed" />
+<fi:FaceEnrollmentView PersonName="{Binding Name}" Completed="OnEnrolled" />
+```
+
+`FaceRecognitionView.EnrollAsync(name)` still exists for a one-off single-shot capture off the current frame; the guided sequence is `FaceEnrollmentView.BeginEnrollment()`.
+
+Registration is still one line in the module — `builder.Services.AddTransient<FaceRecognitionAnalyzer>()` (transient: it holds per-camera state). Everything else the control does itself. Drop to the raw `FaceRecognitionAnalyzer` + `CameraView.Analyzer` only when you need a camera configured in ways the wrapper doesn't expose.
+
+**Enroll and recognize MUST share the pipeline (settled — this was a real bug).** `EnrollAsync` stores `analyzer.LastFace` — the exact JPEG bytes and pixel `FaceBox` the recognizer is handed. Enrolling from a separately captured still instead (what the Enroll page used to do via `CapturePhotoAsync`) put the template through *different* preprocessing than every probe it would later be compared against: different orientation handling, and on the front camera a mirror the analyzer corrects and the still does not. That is a systematic offset applied to every distance in the gallery, and no amount of `MaxDistance` tuning fixes it. If you add another enrollment entry point, route it through `LastFace` too.
+
+**Per-frame flow.** `AnalyzeAsync` → `FrameImageConverter.ToUpright(frame, MaxAnalysisWidth)` → JPEG-encode once → `IFaceDetector.Detect` (cheap, every frame) → return an `OverlayBox` for the live preview. The **full** pipeline (`IFaceIntelligence.Recognize(bytes, box)` = ArcFace embed + sqlite-vec query) only runs once the face has held steady, throttled after that. Tunables on the analyzer: `StabilityFrames` (3), `StabilityTolerance` (0.05 of the frame), `RecognitionInterval` (2 s), `MaxAnalysisWidth` (720), `MinConfidence` (0.7), `MatchColor`/`UnknownColor`/`UnknownText`. `FaceRecognized` fires for **every** attempt including no-match, so the UI can say "Unknown" rather than holding a stale name. The camera pipeline runs analyzers max-one-in-flight and drops frames while busy, so the analyzer self-paces — it may take a whole frame interval without backing up the camera.
+
+**One coordinate space.** `FrameImageConverter` produces an **upright, mirror-corrected** `SKBitmap`, and *everything* — the detector's pixel `FaceBox`, the embed crop, and the normalized `OverlayBox.Rect` — is expressed against that single bitmap. This is what kills the old normalized-vs-pixel and front-camera-mirroring bugs: rotation and mirroring are applied once, up front, from `CameraFrame.Rotation`/`IsMirrored`. The mirror is applied in **sensor** space (before the rotation) because that's where the flip physically happens — Skia composes so the last transform applied is the innermost.
+
+**The converter is the only per-platform code**, a `sealed partial class` with one `ToUpright` per OS (the `DocumentImageExtractor` pattern from `Shiny.Maui.Controls.Camera.Ai`):
+- **Apple** — `AppleCameraFrame.Bgra` is already a managed BGRA copy, so it's a `Marshal.Copy` into an `SKBitmap`. No CGImage/CoreImage round-trip.
+- **Android** — `AndroidCameraFrame.Proxy` is CameraX `YUV_420_888`; converted in managed code (BT.601, honoring row/pixel strides). The loop **subsamples straight to the target width** rather than converting full-res then resizing, so cost scales with `MaxAnalysisWidth`, not sensor size.
+
+Only `net10.0-android;net10.0-ios;net10.0-maccatalyst` — there are no camera frames on bare `net10.0`, and Windows is unbuilt/untested (add a `Platforms/Windows` converter for `WindowsCameraFrame.SoftwareBitmap` if a Windows head is ever wanted).
+
+### Two controls: recognize vs enroll
+
+`FaceRecognitionView` and `FaceEnrollmentView` are deliberately separate — they want opposite things. Recognition wants one fast confident answer; enrollment wants a *diverse* gallery and needs steps, progress and instructions. A single control with a `Mode` flag would leave half its API dead in either mode. (`FaceCameraView` remains as an `[Obsolete]` subclass of `FaceRecognitionView` so existing XAML keeps compiling.)
+
+```xml
+<fi:FaceRecognitionView FaceRecognized="OnRecognized" />
+<fi:FaceEnrollmentView PersonName="{Binding Name}" Completed="OnEnrolled" />
+```
+
+Both resolve their services from `Handler.MauiContext.Services`, so neither needs anything injected.
+
+**The wizard gates on what is measurable — and head angle is not.** `IFaceDetector` returns a box and a confidence; there are no landmarks and no yaw/pitch, so a prompt like "turn your head slightly left" can be *shown* but never *verified*. `FaceEnrollmentView` therefore checks:
+
+| Gate | Verifiable? | Notes |
+|---|---|---|
+| Face size vs frame (`MinFaceFraction`/`MaxFaceFraction`) | yes | drives the "move closer"/"move back" steps |
+| Steadiness (`RequiredStableFrames`) | yes | reuses the analyzer's stability counter |
+| Sharpness + brightness (`FrameQuality`) | yes | variance-of-Laplacian at a fixed 96×96 working size so the threshold is scale-independent |
+| **Novelty** (`MinNoveltyDistance`, default 0.06) | yes | embeds the candidate and rejects it if within that cosine distance of any shot already captured |
+| Head angle | **no** | instructed only |
+
+Novelty is the gate that does the real work. The purpose of a varied gallery *is* embedding spread, so measuring spread directly beats trusting that someone turned their head — it's what stops six near-identical front-on shots. `FaceEnrollmentResult.MinPairwiseDistance` reports the tightest pair so a caller can tell whether the sequence actually achieved variety.
+
+Per-frame cost is kept off the UI thread and single-flight: cheap geometric gates run inline on the analyzer's new `FaceDetected` event, and only once those pass does the control decode/measure/embed inside a `Task.Run` (`evaluating` guards re-entry). Enrollment uses the box-based `Enroll(name, imageData, box)` on the analyzed frame, so templates and probes share preprocessing. Shots after the first are enrolled without the duplicate gate — the sequence is explicitly one person, and shots 2..n *should* match shot 1.
+
+Adding real pose verification later means a landmark/head-pose model behind a new seam; that would also unlock the 5-point alignment TODO. Until then, don't write code that claims to check angle.
+
+### Critical gotcha: `CameraView` silently no-ops before its handler connects
+
+`CameraView` routes every call through `Controller => this.Handler as ICameraViewController`, and **every method null-guards to a silent success**: `RequestPermissionAsync` → `Task.FromResult(false)`, `StartAsync` → `Task.CompletedTask`. So calling them before the handler is connected does nothing, reports nothing, and throws nothing.
+
+`ContentPage.OnAppearing` fires **before** the handler exists on these pages (`BindingContext` is null there too, so a status message written to the VM in `OnAppearing` is also dropped). Starting the camera only from `OnAppearing` therefore left the preview black forever with no error anywhere — it looked exactly like "the page does nothing". It presents as a **permission** problem, which it is not: `AVCaptureDevice.GetAuthorizationStatus(Video)` returns `Authorized` while `RequestPermissionAsync()` returns `false` and no prompt appears. That mismatch is the tell.
+
+The fix, in both `RecognizePage` and `EnrollPage`: an idempotent `StartCamera()` called from **both** `OnAppearing` and `Camera.HandlerChanged`, guarded by a `started` flag (reset in `OnDisappearing` and on any failure path) so whichever happens last wins.
+
+```csharp
+this.Camera.HandlerChanged += (_, _) => this.StartCamera();   // ctor
+protected override void OnAppearing() { base.OnAppearing(); this.StartCamera(); }
+async void StartCamera()
+{
+    if (this.started || this.Camera.Handler is null) return;   // <- the guard that matters
+    ...
+}
+```
+
+Only `CapturePhotoAsync` throws (`InvalidOperationException("CameraView handler is not connected")`) instead of no-opping. Everything else fails silently — so when a camera page appears dead, **check `Camera.Handler` first**.
+
+**Debugging note.** `maui devflow logs` surfaces only `console.out` — `builder.Logging.AddDebug()` output does **not** appear. Trace camera/analyzer stages with `Console.WriteLine`. `RecognizePage.Trace()` writes to both console.out and the VM's `DiagnosticText`, which is rendered as a small second line on the page, so pipeline state is visible on-device without a debugger.
+
+
 ## Runtime assets you must supply (not in the repo)
 
-The app launches without these; enroll/recognize surface a "model missing" message rather than crashing.
+**`./Sample/fetch-models.sh` downloads the two face models** (idempotent — skips what's already there): ArcFace from InsightFace **buffalo_s** (`w600k_mbf`/MobileFaceNet, ~13 MB, in `[-1,3,112,112]` → out `[1,512]`) and **UltraFace version-RFB-320** from the ONNX model zoo (~1.3 MB, in `[1,3,240,320]` → `scores[1,4420,2]`+`boxes[1,4420,4]`, matching `OnnxDetectorOptions`' defaults exactly). It deliberately does **not** fetch `ecapa.onnx` — supply the speaker embedder yourself. The app launches without any of these; enroll/recognize surface a "model missing" message rather than crashing.
 1. **ArcFace ONNX model** (112×112 in, 512-d out). Drop it at `Sample/Resources/Raw/arcface.onnx` (gitignored — supply per build); the `Resources\Raw\**` glob bundles it. The Sample loads it **as bytes** and configures `face.UseOnnxEmbedder(o => o.ModelBytesProvider = () => LoadBundledModel("arcface.onnx"))` (reads via `FileSystem.OpenAppPackageFileAsync`). Bundled assets aren't real file paths on iOS/Android, so use `ModelBytesProvider`/`ModelBytes` rather than `ModelPath` — `OnnxEmbedderOptions` supports all three (priority: provider → bytes → path), and `OnnxArcFaceEmbedder` has matching `byte[]` (bundled/server-stream) and `string` (file/server) constructors. The provider runs lazily on first enroll/recognize, so a missing model surfaces there (pages catch `FileNotFoundException`), not at startup. Model size dominates app size — prefer a compact ArcFace (MobileFaceNet/`w600k_mbf`, single-digit MB) over `w600k_r50` (~166 MB) for on-device; download-on-first-run is the alternative for large models.
-2. **UltraFace detector ONNX model** (for the no-box enrollment path). Drop it at `Sample/Resources/Raw/face_detector.onnx` (gitignored — supply per build). Same lazy-bytes flow as ArcFace: `face.UseOnnxDetector(o => o.ModelBytesProvider = () => LoadBundledModel("face_detector.onnx"))`, loaded on first enroll (missing → `FileNotFoundException`, caught by the page). Defaults target **UltraFace version-RFB-320 / slim-320** (input `1×3×240×320`, scores`[1,N,2]`+boxes`[1,N,4]` normalized); tune `OnnxDetectorOptions.InputWidth/Height/Mean/Std/ScoreThreshold/IouThreshold`. A detector with a different output layout (SCRFD/RetinaFace/YuNet) needs its own `IFaceDetector` via `UseDetector(...)`. Tiny (~1 MB), so negligible next to ArcFace. **Only the Enroll page needs it** — Recognize still uses the camera analyzer.
+2. **UltraFace detector ONNX model** (needed by **both** enrollment and the live recognize analyzer). Drop it at `Sample/Resources/Raw/face_detector.onnx` (gitignored — supply per build). Same lazy-bytes flow as ArcFace: `face.UseOnnxDetector(o => o.ModelBytesProvider = () => LoadBundledModel("face_detector.onnx"))`, loaded on first enroll (missing → `FileNotFoundException`, caught by the page). Defaults target **UltraFace version-RFB-320 / slim-320** (input `1×3×240×320`, scores`[1,N,2]`+boxes`[1,N,4]` normalized); tune `OnnxDetectorOptions.InputWidth/Height/Mean/Std/ScoreThreshold/IouThreshold`. A detector with a different output layout (SCRFD/RetinaFace/YuNet) needs its own `IFaceDetector` via `UseDetector(...)`. Tiny (~1 MB), so negligible next to ArcFace.
 3. **sqlite-vec native binary** (`vec0.dylib` / `vec0.so` per RID), loadable by `SqliteConnection.LoadExtension`. Set `SqliteFaceStoreOptions.VectorExtensionPath` (default `"vec0"`; loader searches app dir + OS paths) in `UseSqliteStore`.
 
 **App-size note.** The full `Microsoft.ML.OnnxRuntime` native runtime is the fixed floor: ~33 MB (iOS arm64 static lib, force-loaded) / ~17 MB (Android `libonnxruntime.so`, arm64-v8a) per shipped architecture, uncompressed; the managed binding and `Shiny.FaceIntelligence.dll` are negligible (~0.2 MB / ~36 KB). The model is the swing factor — `w600k_r50` ~166 MB vs MobileFaceNet ~4–5 MB. If that ~17–33 MB ORT floor is a real constraint, a **reduced/minimal ONNX Runtime build** shrinks the native lib by stripping operators and types down to only what your model uses:
@@ -173,19 +251,66 @@ The audio twin of the face stack, deliberately built to the **same architecture*
 services.AddVoiceIntelligence(voice =>
 {
     voice.Options.MaxDistance = 0.7f;                                            // see tuning caveat below
-    voice.UseOnnxEmbedder(o => o.ModelBytesProvider = () => LoadBundled("ecapa.onnx"));
+    voice.UseOnnxEmbedder(o =>
+    {
+        o.ModelBytesProvider = () => LoadBundled("ecapa.onnx");
+        o.Dimensions = 512;   // MUST match the model (512 = CAM++/WeSpeaker, 192 = many ECAPA exports)
+    });
     voice.UseSqliteStore(o => o.ConnectionString = "Data Source=voices.db");
 });
 ```
 
 **Key differences from face (all deliberate):**
 - **Capture-agnostic core.** Face core takes `byte[] imageData` + `FaceBox`; voice core takes a `float[]` **sample buffer** (mono PCM, [-1,1], at `ISpeakerEmbedder.SampleRate`, default 16 kHz). The library **never touches audio hardware** — capturing (mic/file/stream) is the app's job, exactly as the camera is for face. So voice core has **no SkiaSharp** and no image/thumbnail stage; `Speaker` has no thumbnail.
-- **Embedder input is the raw waveform.** `OnnxEcapaEmbedder` feeds `[1, samples]` (the common ECAPA export) → `Run` → L2-normalize. A model that expects **features (fbank/MFCC)** needs a feature-extraction step added before `Run` — swap in your own `ISpeakerEmbedder` via `UseEmbedder(...)` for that. Dimension hint defaults to **192** (ECAPA-TDNN); ArcFace's 512 does not apply.
+- **Embedder input is waveform *or* fbank, detected from the model.** `OnnxEcapaEmbedder` reads the declared input rank and either feeds `[1, samples]` directly or runs `KaldiFbank` to build `[1, frames, 80]` first → `Run` → L2-normalize. See [the auto-detect section](#the-onnx-speaker-embedder-auto-detects-waveform-vs-fbank-input-fixed-2026-07-22). Dimension hint defaults to **192**; the bundled CAM++ model is **512**, and ArcFace's 512 is coincidence, not transfer.
 - **The ArcFace model does NOT transfer** — different modality (image→vector vs audio→vector). What transferred is the **ONNX plumbing**: the options/lazy-provider pattern, `UseOnnxEmbedder`, the bundled-asset flow, and the iOS linker `.targets`. You still supply an ECAPA `.onnx`.
 
 **Shared iOS linker `.targets` — the one real cross-package gotcha.** Both `.Onnx` packages auto-import their `build/<PackageId>.targets`, and an app that references **both** (this repo's Sample will) would hit a **duplicate MSBuild target name** error. So `Shiny.VoiceIntelligence.Onnx.targets` is a copy of the face one with the `Target Name` suffixed **`_DropOnnxRegisterCustomOpsForcedSymbol_Voice`**. The `DisableOnnxRegisterCustomOpsWorkaround` property and the `-Wl,-U,_RegisterCustomOps` flag are intentionally **identical** across both (one toggle governs both; the linker de-dupes the repeated `-U`). Everything in [the ONNX linker section](#critical-gotcha-onnx-runtime-iosmaccatalyst-linker-fix) applies verbatim.
 
-**Threshold tuning is unfinished and important.** `VoiceIntelligenceOptions.MaxDistance` defaults to **`0.7`** (permissive) purely as a placeholder. Speaker-embedding score distributions vary far more by model/channel than face does — this **must** be tuned against your actual ECAPA export with measured FAR/FRR before it means anything. Don't ship the default.
+**Threshold tuning.** `VoiceIntelligenceOptions.MaxDistance` still defaults to **`0.7`** in the package purely as a placeholder; the Sample overrides it from `VoiceTuning.MaxDistance` (0.45, measured — see [Audio capture is the fragile part](#audio-capture-is-the-fragile-part-not-the-threshold-settled--measured-2026-07-22)). Speaker-embedding score distributions vary far more by model/channel than face does — this **must** be tuned against your actual ECAPA export with measured FAR/FRR before it means anything. Don't ship the default.
+
+### Audio capture is the fragile part, not the threshold (settled — measured 2026-07-22)
+
+Speaker matching failed end-to-end (same person, ~0.88 distance = orthogonal) and the cause was entirely in **capture**, upstream of the model. Three defects in `Sample/Platforms/iOS/AppleAudioSource.cs` + `VoiceRecorder`, all now fixed:
+
+1. **`AVAudioSessionMode.VoiceChat`** turned on Apple's voice-processing chain — AGC, noise suppression, echo cancellation. It is adaptive, non-linear, and exists to normalise away speaker and channel characteristics, which is exactly what a speaker embedding encodes; because it adapts per session, two recordings of one person came out different. Use **`Measurement`** (disables the chain). Expect noticeably lower levels afterwards — that's AGC being gone, not a regression (measured rms ~0.01 vs ~0.07 before).
+2. **`AllowBluetooth`/`AllowBluetoothA2DP`** let a paired headset move the route to 8 kHz HFP, so captured bandwidth depended on what was connected. Dropped; verify the route is `MicrophoneBuiltIn` (it is logged at capture start).
+3. **Linear-interpolation resampling** 48 kHz → 16 kHz with no anti-alias filter. That discards two of every three samples and folds everything above 8 kHz back into the speech band; fricatives (/s/, /ʃ/, /f/) live there, and because aliasing is signal-dependent each recording is corrupted *differently*. Replaced with a windowed-sinc resampler with the low-pass folded into the kernel.
+
+**Measured same-speaker distances after the fix** (8 recordings, one speaker, built-in mic, 28 pairs): min 0.011, median 0.110, **max 0.351**. Hence `VoiceTuning.MaxDistance = 0.40` (FRR 0% on that set).
+
+**FAR remains unmeasured, and TTS cannot stand in for it.** An attempt to synthesise impostors from macOS
+voices was invalid: the model rates the legacy MacinTalk synths as the same speaker (Junior vs Kathy = 0.093)
+and even the modern voices sit only 0.31–0.43 apart, so synthetic speech doesn't occupy the same region of
+the embedding space as real speech. A real false-accept rate needs a **second human** enrolled on-device.
+Clip quality matters too: 6 of the 8 recordings clustered within 0.11, while 2 quieter ones sat 0.20–0.35 out
+and drifted toward a generic centroid (they were also the ones closest to TTS voices).
+
+**The model and feature front end were never the problem** and were validated independently: same TTS voice, two different sentences, clean 16 kHz → distance **0.138**. `KaldiFbank` is correct as written, and adding CMN made it *worse* — the "no cepstral mean normalization" note there is right, don't "fix" it. When voice matching regresses, **check capture first**: `[Audio]` console lines report rate/channels/route and every recording is dumped to `Library/recordings/*.wav` under `#if DEBUG`, pullable with `xcrun devicectl device copy from --domain-type appDataContainer --domain-identifier org.shiny.recogiq --source Library/recordings`.
+
+### The ONNX speaker embedder auto-detects waveform vs fbank input (fixed 2026-07-22)
+
+`OnnxEcapaEmbedder` used to feed the raw waveform as `[1, samples]` unconditionally, which threw
+`InvalidArgument: Invalid rank for input: feats Got: 2 Expected: 3` against any standard WeSpeaker export —
+the model family it is named for. It now supports **both** shapes and picks between them from the model's
+own declared input rank when the session loads (so lazy loading is unchanged):
+
+| Model input | Handling |
+|---|---|
+| `[batch, samples]` (rank 2) | raw mono waveform, fed through |
+| `[batch, frames, 80]` (rank 3, usually named `feats`) | `KaldiFbank` computes the filterbank first |
+
+`OnnxEmbedderOptions.InputMode` (`Auto`/`Waveform`/`Fbank80`) forces it if a model's declared shape lies; a
+rank-3 model wanting anything other than 80 bins throws a `NotSupportedException` naming `UseEmbedder(...)`.
+`KaldiFbank` lives in `src/Shiny.VoiceIntelligence.Onnx/Internals/` (it was previously duplicated in the
+Sample) and is covered by `KaldiFbankTests` — bin count, kaldi `snip_edges=false` frame count, determinism,
+and level dependence (which fails if someone adds CMN, deliberately).
+
+**`Dimensions` must match the model's real output width** — 512 for CAM++/WeSpeaker, 192 for many ECAPA
+exports. It sizes the vector store *before* the model loads, so it can't be inferred; a mismatch now throws
+on the first embed rather than silently corrupting stored voiceprints. Probe an unfamiliar model with
+`InferenceSession.InputMetadata` / `OutputMetadata`, and read `ModelMetadata.CustomMetadataMap` — WeSpeaker
+and sherpa-onnx exports carry `framework`, `output_dim`, `sample_rate` and `normalize_samples` there.
 
 ### Anti-spoofing (findings — not yet built in either repo)
 
@@ -194,9 +319,49 @@ Plain voiceprint matching is **defeated by a recording or a voice clone** — tr
 2. **A countermeasure (CM) model** — an `ISpoofDetector` seam (bonafide-vs-spoof classifier: AASIST / RawNet2 / LCNN from ASVspoof, ONNX, same plumbing as the embedder). Passive net for synthetic audio; generalizes poorly to unseen attacks, so a filter not a wall.
 3. **Multimodal liveness** — this repo's real edge: combine **face liveness + the voice challenge** ("look at the camera and say 7-4-1-9"). Strong on-device gate that neither modality gives alone; an argument for keeping face + voice in one repo.
 
+### Guided enrollment: `VoiceEnrollmentSession` (the voice wizard)
+
+`voice.CreateEnrollment(name)` returns a **`VoiceEnrollmentSession`** — the voice twin of `FaceEnrollmentView`'s step sequence: show a sentence, record it, submit it, repeat **until the session says the voiceprints agree well enough to stop**. It lives in **core**, not in a control, because the library never touches audio hardware (the app records and hands over `float[]`, same as `Enroll`) — which also makes it usable server-side and testable without a mic.
+
+```csharp
+var session = voice.CreateEnrollment("Allan");
+while (!session.IsComplete)
+{
+    Show(session.CurrentPrompt);                          // rotates every attempt
+    var step = await session.Submit(await recorder.RecordAsync(VoiceTuning.RecordFor));
+    Show(step.Hint);                                      // "" when accepted
+}
+var result = session.Result!;                             // stored; result.Cohesion is the quality number
+```
+
+**The gate is inverted vs. face, and that's the whole idea.** Face enrollment wants *spread* (varied poses) so it rejects shots too **similar** to ones it has. A speaker embedding is supposed to be the same whatever the person says, so voice rejects clips that **disagree** — agreement is simultaneously the quality gate and the stop condition. What it checks per recording (`VoiceEnrollmentOptions`, `VoiceQuality`):
+
+| Gate | Verifiable? | Notes |
+|---|---|---|
+| Duration / speech vs silence (`MinSpeechSeconds`) | yes | energy-framed, no VAD model; catches "tapped record and said nothing" |
+| Speech level (`MinSpeechLevel`, measured over speech frames only) | yes | quiet clips are the documented drift-to-centroid failure; whole-buffer RMS would punish a pause before speaking |
+| Clipping (`MaxClippedFraction`) | yes | mic too close / gain too high |
+| SNR (`MinSnrDb`) | yes | 90th vs 10th percentile frame energy — rough, can't tell a quiet room from a steady hum |
+| **Agreement** (`MaxOutlierDistance`, then `MaxCohesionDistance`) | yes | the one that carries the weight |
+| The prompt was actually read | **no** | needs STT; the model is text-independent anyway |
+| The voice is live, not a replay/clone | **no** | no anti-spoofing anywhere in this stack |
+
+**Distance settings are derived from the match threshold, never hardcoded** — `VoiceEnrollmentOptions.ForThreshold(maxDistance)` (what `CreateEnrollment` uses) sets `MaxCohesionDistance = 0.75 × threshold` and `MaxOutlierDistance = threshold`. Reasoning: a probe is compared against these templates, so any spread the templates already have comes out of the matching budget; and a clip that wouldn't even *recognize* as the same person is a bad capture or a different person either way.
+
+Session mechanics worth knowing:
+- **Nothing is stored until it completes** (`Reset()`/abandon leaves no half-enrolled speaker). On completion it writes the already-computed embeddings straight to `IVoiceStore` rather than re-calling `Enroll`, which would re-run inference on every clip for an identical result.
+- **Bad-first-clip rescue**: if the *first* accepted recording was the broken one, everything after it gets rejected as inconsistent — deadlock. So a clip rejected as `Inconsistent` is held for one round: if the next one agrees with *it* rather than with the lone survivor, those two out-vote the survivor and it's dropped.
+- **Ran out of attempts** (`MaxSamples`, default 6): drops the worst-disagreeing clips down to `MinSamples` (default 3) and stores what's left with `IsConfident = false` — enrollment succeeds, flagged.
+- `VoiceEnrollmentResult.Cohesion` (worst pairwise distance) is the headline quality number, and the Sample shows it as "agreement".
+- Cohesion is measured **within one session only** — re-enrolling a name says nothing about how the new clips relate to the stored ones.
+
+Covered by `VoiceEnrollmentSessionTests` (real sqlite-vec store + fake embedder, audio gates off since fake "recordings" are vectors, not sound) and `VoiceQualityTests` (synthesized tone/silence/noise/clipping).
+
 ### Voice in the Sample (built)
 
 Voice now has three Sample tabs — **Voice ID** (`VoiceRecognizePage`), **Voice Enroll** (`VoiceEnrollPage`), **Speakers** (`SpeakersPage`) — under `Sample/Features/Voice/` (see [Sample structure](#sample-structure-feature-folders)). They mirror the face pages but are **button-driven, not continuous** (you can't passively sample a voice), and record through mic capture instead of the camera.
+
+**Voice Enroll is a wizard**: Start → read the sentence → Record → repeat, with a progress bar, the live "agreement" number, and a hint line when a clip is turned down. The page holds no enrollment logic at all — it drives a [`VoiceEnrollmentSession`](#guided-enrollment-voiceenrollmentsession-the-voice-wizard) and renders `step.Hint`/`session.*`. (`IsNotEnrolling` on the VM exists purely so the XAML can hide the name entry without an inverse-bool converter.)
 
 **Mic capture is vendored, not a package.** `Shiny.Audio` is *not* published to NuGet, so its capture impls were copied into the Sample rather than referenced: `Sample/Platforms/iOS/AppleAudioSource.cs` (`AVAudioEngine` tap) + `Sample/Platforms/Android/AndroidAudioSource.cs` (`AudioRecord`), both `public class … : IAudioSource` in namespace `Sample.Features.Voice.Audio` so `AddAudioCapture()` picks the right one per-TFM via `#if IOS/ANDROID` (a `NullAudioSource` stub covers MacCatalyst/Windows). **Format normalization is deliberate**: the shared `IAudioSource` contract yields **float32 mono** at the device's native rate (the vendored Apple source's `desiredFormat` was never applied — it taps at hardware rate), and **`VoiceRecorder` resamples to the 16 kHz** the embedder needs (Android is already 16 kHz → no-op; Apple ~48 kHz → linear resample). `VoiceRecorder.RecordAsync(TimeSpan)` is the single seam the pages use: it owns the **MAUI `Permissions.Microphone`** request, capture lifetime, and PCM→float→resample. Needs `NSMicrophoneUsageDescription` (iOS) + `RECORD_AUDIO` (Android), both added. Still needs a real ECAPA `.onnx` bundled at `Sample/Resources/Raw/ecapa.onnx` (gitignored, supplied per build, same as `arcface.onnx`); missing model surfaces as a "model missing" message on the voice pages, not a crash.
 
@@ -208,8 +373,8 @@ Voice now has three Sample tabs — **Voice ID** (`VoiceRecognizePage`), **Voice
 
 The Sample is organized **by feature (vertical slices)**, mirroring `~/Desktop/dev/wonderland`, not by technical layer. Each `Features/<Domain>/` folder owns its pages+VMs (under `Pages/`) and a per-feature **`IMauiModule`** that registers its services:
 
-- `Features/Face/` — `FaceModule` (`AddFaceIntelligence`), `FaceDetectionExtensions`, `Pages/` (Recognize/Enroll/People + `PersonRow`). Namespace `Sample.Features.Face[.Pages]`.
-- `Features/Voice/` — `VoiceModule` (`AddVoiceIntelligence` + `AddAudioCapture`), `Audio/` (vendored `IAudioSource`/`PipeStream`/`VoiceRecorder`/`AudioCaptureRegistration`/`NullAudioSource`), `Pages/` (VoiceRecognize/VoiceEnroll/Speakers + `SpeakerRow`).
+- `Features/Face/` — `FaceModule` (`AddFaceIntelligence` + `AddTransient<FaceRecognitionAnalyzer>`), `Pages/` (Recognize uses `FaceRecognitionView`, Enroll uses the `FaceEnrollmentView` wizard, People + `PersonRow`). Namespace `Sample.Features.Face[.Pages]`. (`FaceDetectionExtensions.cs` was deleted with the camera `FaceAnalyzer` path.)
+- `Features/Voice/` — `VoiceModule` (`AddVoiceIntelligence` + `AddAudioCapture`), `VoiceTuning` (measured `MaxDistance`/`RecordFor`), `Audio/` (vendored `IAudioSource`/`PipeStream`/`VoiceRecorder`/`AudioCaptureRegistration`/`NullAudioSource`), `Pages/` (VoiceRecognize/VoiceEnroll/Speakers + `SpeakerRow`). The fbank front end that used to live here (`KaldiFbank`, `FbankSpeakerEmbedder`) moved into `Shiny.VoiceIntelligence.Onnx`.
 - `Features/Documents/` — `DocumentsModule` (`AddDocumentIntelligence`), `Pages/` (Scan).
 - `Infrastructure/BundledAssets.cs` — `LoadBundledModel(...)` shared by the Face + Voice modules.
 

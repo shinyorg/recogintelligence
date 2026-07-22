@@ -56,6 +56,7 @@
     <ItemGroup>
         <ProjectReference Include="..\src\Shiny.FaceIntelligence.Onnx\Shiny.FaceIntelligence.Onnx.csproj"/>
         <ProjectReference Include="..\src\Shiny.FaceIntelligence.DocumentDb.Sqlite\Shiny.FaceIntelligence.DocumentDb.Sqlite.csproj"/>
+        <ProjectReference Include="..\src\Shiny.FaceIntelligence.Maui\Shiny.FaceIntelligence.Maui.csproj"/>
         <ProjectReference Include="..\src\Shiny.VoiceIntelligence.Onnx\Shiny.VoiceIntelligence.Onnx.csproj"/>
         <ProjectReference Include="..\src\Shiny.VoiceIntelligence.DocumentDb.Sqlite\Shiny.VoiceIntelligence.DocumentDb.Sqlite.csproj"/>
         <ProjectReference Include="..\src\Shiny.DocumentIntelligence\Shiny.DocumentIntelligence.csproj"/>
@@ -64,7 +65,6 @@
         <PackageReference Include="CommunityToolkit.Mvvm"/>
         <PackageReference Include="Shiny.Maui.Controls"/>
         <PackageReference Include="Shiny.Maui.Controls.Camera"/>
-        <PackageReference Include="Shiny.Maui.Controls.Camera.Face"/>
         <PackageReference Include="Microsoft.Maui.DevFlow.Agent"/>
     </ItemGroup>
 

@@ -1,65 +1,41 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Shiny;
-using Shiny.FaceIntelligence;
+using Shiny.FaceIntelligence.Maui;
 
 namespace Sample.Features.Face.Pages;
 
 [ShellMap<EnrollPage>("Enroll", registerRoute: false)]
-public partial class EnrollViewModel(IFaceIntelligence recognizer, IDialogs dialogs) : ObservableObject
+public partial class EnrollViewModel : ObservableObject
 {
-    int shotCount;
-
     [ObservableProperty]
     public partial string? Name { get; set; }
 
     [ObservableProperty]
-    public partial string StatusText { get; set; } = "Enter a name, then capture a few shots from different angles.";
+    public partial string StatusText { get; set; } =
+        "Enter a name, then start — you'll be prompted through a few angles and distances.";
 
-    /// <summary>
-    /// Run detect + embed + store on a captured still. The ONNX detector finds the face and the manager
-    /// enforces the quality gates, so we translate its typed errors into a status message instead of
-    /// silently enrolling a bad shot.
-    /// </summary>
-    public async Task Process(byte[] photoData)
+    /// <summary>Kick off the guided sequence. The control handles every step from here.</summary>
+    public void StartEnrollment(FaceEnrollmentView camera)
     {
-        var name = this.Name!.Trim();
         try
         {
-            await recognizer.Enroll(name, photoData);
-            this.shotCount++;
-            this.StatusText = $"Enrolled '{name}' — {this.shotCount} shot(s). Capture more for accuracy.";
-        }
-        catch (FaceDetectionException ex)
-        {
-            // No/low-confidence/multiple/too-small face — ex.Message already says what to fix.
-            this.StatusText = ex.Message;
-        }
-        catch (FaceEnrollmentConflictException ex)
-        {
-            // This face already matches someone else — confirm before forcing a new identity.
-            var enrollAnyway = await dialogs.Confirm(
-                "Looks familiar",
-                $"This looks like '{ex.Match.Name}'. Enroll as '{name}' anyway?",
-                "Enroll anyway",
-                "Cancel");
-
-            if (!enrollAnyway)
-            {
-                this.StatusText = $"Cancelled — this face matched '{ex.Match.Name}'.";
-                return;
-            }
-
-            await recognizer.Enroll(name, photoData, allowDuplicate: true);
-            this.shotCount++;
-            this.StatusText = $"Enrolled '{name}' — {this.shotCount} shot(s). Capture more for accuracy.";
-        }
-        catch (FileNotFoundException)
-        {
-            this.StatusText = "Model missing — drop arcface.onnx and face_detector.onnx in Sample/Resources/Raw (see README).";
+            camera.BeginEnrollment();
+            this.StatusText = "Follow the prompts on the preview.";
         }
         catch (Exception ex)
         {
-            this.StatusText = $"Enroll failed ({ex.GetType().Name}): {ex.Message}";
+            this.StatusText = ex.Message;
         }
+    }
+
+    /// <summary>
+    /// Report the finished gallery. MinPairwiseDistance is the useful number: it says how much spread the
+    /// captured shots actually have, which is what the prompts were for.
+    /// </summary>
+    public void Show(FaceEnrollmentResult result)
+    {
+        var skipped = result.SkippedSteps > 0 ? $", {result.SkippedSteps} step(s) skipped" : String.Empty;
+        this.StatusText =
+            $"Enrolled {result.People.Count} shots for '{result.Name}' — closest pair {result.MinPairwiseDistance:F3}{skipped}.";
     }
 }

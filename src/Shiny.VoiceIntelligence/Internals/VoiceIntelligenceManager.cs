@@ -30,6 +30,17 @@ public class VoiceIntelligenceManager(
         return person;
     }
 
+    /// <summary>
+    /// The configured match threshold, reachable from a method whose own parameter is called
+    /// <c>options</c> (which would otherwise shadow the primary-constructor one).
+    /// </summary>
+    float MaxDistance => options.MaxDistance;
+
+    public VoiceEnrollmentSession CreateEnrollment(string name, VoiceEnrollmentOptions? options = null)
+        // The session's distance gates only mean anything relative to the threshold matching actually uses,
+        // so the defaults come from this instance's configuration rather than from a constant.
+        => new(name, embedder, store, options ?? VoiceEnrollmentOptions.ForThreshold(this.MaxDistance));
+
     public async Task<RecognitionResult> Recognize(float[] samples, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(samples);
@@ -44,7 +55,10 @@ public class VoiceIntelligenceManager(
 
         var best = hits[0];
         if (best.Distance > options.MaxDistance)
-            return RecognitionResult.NoMatch;
+            // A near miss and a total stranger are both "no match", but they mean completely different
+            // things when tuning MaxDistance — so report how close the nearest actually got. Name stays
+            // null, so IsMatch is still false and callers that only check IsMatch are unaffected.
+            return new RecognitionResult(null, best.Distance, null);
 
         return new RecognitionResult(best.Speaker.Name, best.Distance, best.Speaker.Id);
     }

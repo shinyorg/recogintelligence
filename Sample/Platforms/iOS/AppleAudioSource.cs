@@ -45,12 +45,18 @@ public class AppleAudioSource(ILogger<AppleAudioSource> logger) : IAudioSource
         });
 
         var audioSession = AVAudioSession.SharedInstance();
-        audioSession.SetCategory(
-            AVAudioSessionCategory.Record,
-            AVAudioSessionCategoryOptions.AllowBluetooth | AVAudioSessionCategoryOptions.AllowBluetoothA2DP,
-            out _
-        );
-        audioSession.SetMode(AVAudioSessionMode.VoiceChat.GetConstant()!, out _);
+
+        // No AllowBluetooth: a paired BT headset drags the route onto 8 kHz HFP, so the captured bandwidth
+        // would silently depend on what happens to be connected — fatal when comparing a recording made
+        // today against a voiceprint enrolled last week.
+        audioSession.SetCategory(AVAudioSessionCategory.Record, AVAudioSessionCategoryOptions.DefaultToSpeaker, out _);
+
+        // Measurement, NOT VoiceChat. VoiceChat turns on Apple's voice processing — AGC, noise suppression,
+        // echo cancellation — which is adaptive, non-linear, and specifically designed to normalise away
+        // speaker and channel characteristics. That is exactly the information a speaker embedding encodes,
+        // and because it adapts per session two recordings of the same person come out differently.
+        // Measurement disables that chain and gives the rawest mic signal iOS will hand over.
+        audioSession.SetMode(AVAudioSessionMode.Measurement.GetConstant()!, out _);
         audioSession.SetActive(true, out _);
 
         this.audioEngine.Prepare();
@@ -58,7 +64,11 @@ public class AppleAudioSource(ILogger<AppleAudioSource> logger) : IAudioSource
         if (error != null)
             throw new InvalidOperationException($"Failed to start audio engine: {error.LocalizedDescription}");
 
-        logger.LogDebug("Apple audio capture started at {Rate} Hz", this.SampleRate);
+        var route = audioSession.CurrentRoute?.Inputs?.FirstOrDefault();
+        var msg = $"[Audio] capture started {this.SampleRate} Hz, {inputFormat.ChannelCount} ch, " +
+                  $"interleaved={inputFormat.Interleaved}, route={route?.PortType ?? "?"} ({route?.PortName ?? "?"})";
+        logger.LogDebug(msg);
+        Console.WriteLine(msg);   // console.out is what `maui devflow logs` surfaces
         return Task.FromResult<Stream>(stream);
     }
 

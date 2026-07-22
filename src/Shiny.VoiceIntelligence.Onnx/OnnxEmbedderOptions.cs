@@ -30,4 +30,11 @@ public class OnnxEmbedderOptions
 
     /// <summary>Sample rate the model expects, in Hz. Defaults to <c>16000</c>. Callers must feed audio at this rate.</summary>
     public int SampleRate { get; set; } = 16000;
+
+    /// <summary>
+    /// How the model's input tensor is fed. Defaults to <see cref="OnnxSpeakerInputMode.Auto"/>, which reads
+    /// the model's declared input rank — correct for both raw-waveform ECAPA exports and feature-input
+    /// WeSpeaker/sherpa exports. Set explicitly only if a model's declared shape is misleading.
+    /// </summary>
+    public OnnxSpeakerInputMode InputMode { get; set; } = OnnxSpeakerInputMode.Auto;
 }

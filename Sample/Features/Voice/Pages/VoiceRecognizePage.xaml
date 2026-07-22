@@ -19,10 +19,17 @@
                 IsEnabled="{Binding IsIdle}" />
         <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
         <Border Padding="16,12" BackgroundColor="#CC000000" StrokeShape="RoundRectangle 14">
-            <Label Text="{Binding ResultText}"
-                   TextColor="White"
-                   FontSize="18"
-                   HorizontalTextAlignment="Center" />
+            <VerticalStackLayout Spacing="4">
+                <Label Text="{Binding ResultText}"
+                       TextColor="White"
+                       FontSize="18"
+                       HorizontalTextAlignment="Center" />
+                <!-- Measured distance + clip level: tells a near miss apart from a broken recording. -->
+                <Label Text="{Binding DiagnosticText}"
+                       TextColor="#99FFFFFF"
+                       FontSize="11"
+                       HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
         </Border>
     </VerticalStackLayout>
 

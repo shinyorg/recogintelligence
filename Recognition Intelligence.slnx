@@ -11,6 +11,7 @@
     <Project Path="src\Shiny.FaceIntelligence\Shiny.FaceIntelligence.csproj" />
     <Project Path="src\Shiny.FaceIntelligence.Onnx\Shiny.FaceIntelligence.Onnx.csproj" />
     <Project Path="src\Shiny.FaceIntelligence.DocumentDb\Shiny.FaceIntelligence.DocumentDb.csproj" />
+    <Project Path="src\Shiny.FaceIntelligence.Maui\Shiny.FaceIntelligence.Maui.csproj" />
     <Project Path="src/Shiny.DocumentIntelligence/Shiny.DocumentIntelligence.csproj" />
     <Project Path="src\Shiny.FaceIntelligence.DocumentDb.Sqlite\Shiny.FaceIntelligence.DocumentDb.Sqlite.csproj" />
     <Project Path="src\Shiny.VoiceIntelligence\Shiny.VoiceIntelligence.csproj" />

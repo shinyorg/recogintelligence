@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:cam="http://shiny.net/maui/camera"
+             xmlns:fi="clr-namespace:Shiny.FaceIntelligence.Maui;assembly=Shiny.FaceIntelligence.Maui"
              xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
              xmlns:vm="clr-namespace:Sample.Features.Face.Pages"
              x:Class="Sample.Features.Face.Pages.RecognizePage"
@@ -15,25 +15,27 @@
     </ContentPage.ToolbarItems>
 
     <Grid>
-        <!-- Live preview. The FaceAnalyzer detects faces on-device; we capture a still ourselves off
-             FacesDetected (the CaptureOnDetection/DetectionCaptured path doesn't fire on iOS in this beta). -->
-        <cam:CameraView x:Name="Camera"
-                        Facing="Front"
-                        ScaleMode="AspectFill">
-            <cam:FaceAnalyzer IsEnabled="True"
-                              ShowBoundingBox="True"
-                              FacesDetected="OnFacesDetected" />
-        </cam:CameraView>
+        <!-- The whole recognition pipeline: preview, permission, detection, matching. The control resolves
+             the analyzer from DI itself, so there is nothing to wire up here. -->
+        <fi:FaceRecognitionView x:Name="FaceCamera"
+                           FaceRecognized="OnFaceRecognized"
+                           CameraFailed="OnCameraFailed" />
 
         <Border VerticalOptions="End"
                 Margin="16"
                 Padding="16,12"
                 BackgroundColor="#CC000000"
                 StrokeShape="RoundRectangle 14">
-            <Label Text="{Binding ResultText}"
-                   TextColor="White"
-                   FontSize="18"
-                   HorizontalTextAlignment="Center" />
+            <VerticalStackLayout Spacing="4">
+                <Label Text="{Binding ResultText}"
+                       TextColor="White"
+                       FontSize="18"
+                       HorizontalTextAlignment="Center" />
+                <Label Text="{Binding DiagnosticText}"
+                       TextColor="#99FFFFFF"
+                       FontSize="11"
+                       HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
         </Border>
     </Grid>
 

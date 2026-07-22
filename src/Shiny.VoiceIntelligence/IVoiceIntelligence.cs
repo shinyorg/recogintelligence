@@ -19,6 +19,19 @@ public interface IVoiceIntelligence
     Task<Speaker> Enroll(string name, float[] samples, CancellationToken ct = default);
 
     /// <summary>
+    /// Start a guided enrollment for <paramref name="name"/>: prompt-by-prompt recording that checks each
+    /// clip and decides for itself when it has enough good ones. Prefer this over calling
+    /// <see cref="Enroll"/> in a loop when a person is enrolling themselves — a bad recording that
+    /// <see cref="Enroll"/> would happily store becomes a template every future match is compared against.
+    /// </summary>
+    /// <param name="name">Name to enroll under.</param>
+    /// <param name="options">
+    /// Prompts and gates. Defaults are derived from <see cref="VoiceIntelligenceOptions.MaxDistance"/>, so
+    /// leave this null unless you have a reason.
+    /// </param>
+    VoiceEnrollmentSession CreateEnrollment(string name, VoiceEnrollmentOptions? options = null);
+
+    /// <summary>
     /// Embed <paramref name="samples"/> and return the nearest enrolled name within the configured distance
     /// threshold, or <see cref="RecognitionResult.NoMatch"/> when nothing is close enough.
     /// </summary>

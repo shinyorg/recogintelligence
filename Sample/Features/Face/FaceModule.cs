@@ -4,6 +4,7 @@ using Shiny;
 using Shiny.FaceIntelligence;
 using Shiny.FaceIntelligence.Onnx;
 using Shiny.FaceIntelligence.DocumentDb.Sqlite;
+using Shiny.FaceIntelligence.Maui;
 
 namespace Sample.Features.Face;
 
@@ -31,6 +32,10 @@ public class FaceModule : IMauiModule
                 o.ConnectionString = $"Data Source={Path.Combine(dataDir, "faces.db")}";
             });
         });
+
+        // The live-recognition frame analyzer (Shiny.FaceIntelligence.Maui). Transient: it carries per-camera
+        // state (stability counter, last result), so each page that hosts one gets its own.
+        builder.Services.AddTransient<FaceRecognitionAnalyzer>();
     }
 
     public void Use(IPlatformApplication app) { }

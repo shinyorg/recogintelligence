@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- A CameraView frame analyzer, so this is necessarily MAUI + per-platform: the frame arrives as a
+             native buffer (Apple BGRA, Android YUV_420_888) that has to be converted, oriented and
+             de-mirrored before any ONNX model sees it. No bare net10.0 target — there are no camera frames
+             off-device, and the analyzer would have nothing to implement. -->
+        <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+        <UseMaui>true</UseMaui>
+        <Description>Live face recognition as a Shiny CameraView frame analyzer: detects faces on every frame and runs Shiny.FaceIntelligence recognition when a face holds steady — no still capture required.</Description>
+
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../Shiny.FaceIntelligence/Shiny.FaceIntelligence.csproj" />
+        <PackageReference Include="Shiny.Maui.Controls.Camera" />
+    </ItemGroup>
+
+    <!-- Per-platform frame conversion. Everything under Platforms/ is opted out, then back in by TFM. -->
+    <ItemGroup>
+        <Compile Remove="Platforms/**/*.cs" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'ios' Or '$(TargetPlatformIdentifier)' == 'maccatalyst'">
+        <Compile Include="Platforms/Apple/**/*.cs" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'android'">
+        <Compile Include="Platforms/Android/**/*.cs" />
+    </ItemGroup>
+
+</Project>

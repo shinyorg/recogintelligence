@@ -46,7 +46,54 @@ public class VoiceRecorder(IAudioSource source)
         }
 
         var captured = ToFloatSamples(ms.GetBuffer(), (int)ms.Length);
-        return Resample(captured, source.SampleRate, TargetSampleRate);
+        var resampled = Resample(captured, source.SampleRate, TargetSampleRate);
+        Console.WriteLine(
+            $"[Audio] captured {captured.Length} @ {source.SampleRate} Hz " +
+            $"({captured.Length / (float)source.SampleRate:F2}s) -> {resampled.Length} @ {TargetSampleRate} Hz");
+        DumpWav(resampled);
+        return resampled;
+    }
+
+    /// <summary>
+    /// Write the final 16 kHz buffer to the app container so a recording can be pulled off-device
+    /// (<c>xcrun devicectl device copy from --domain-type appDataContainer</c>) and inspected against the
+    /// model directly. Diagnosing a speaker-matching problem from a distance number alone is guesswork;
+    /// having the actual audio is not.
+    /// </summary>
+    [System.Diagnostics.Conditional("DEBUG")]
+    static void DumpWav(float[] samples)
+    {
+        try
+        {
+            var dir = Path.Combine(FileSystem.AppDataDirectory, "recordings");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, $"rec-{DateTime.UtcNow:yyyyMMdd-HHmmss-fff}.wav");
+
+            using var fs = File.Create(path);
+            using var w = new BinaryWriter(fs);
+            var dataBytes = samples.Length * 2;
+            w.Write("RIFF"u8.ToArray());
+            w.Write(36 + dataBytes);
+            w.Write("WAVE"u8.ToArray());
+            w.Write("fmt "u8.ToArray());
+            w.Write(16);
+            w.Write((short)1);                       // PCM
+            w.Write((short)1);                       // mono
+            w.Write(TargetSampleRate);
+            w.Write(TargetSampleRate * 2);           // byte rate
+            w.Write((short)2);                       // block align
+            w.Write((short)16);                      // bits
+            w.Write("data"u8.ToArray());
+            w.Write(dataBytes);
+            foreach (var s in samples)
+                w.Write((short)Math.Clamp((int)MathF.Round(s * 32767f), short.MinValue, short.MaxValue));
+
+            Console.WriteLine($"[Audio] wrote {path}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Audio] dump failed: {ex.Message}");
+        }
     }
 
     /// <summary>Reinterpret the captured little-endian float32 bytes as a float sample array.</summary>
@@ -58,23 +105,53 @@ public class VoiceRecorder(IAudioSource source)
         return samples;
     }
 
-    /// <summary>Linear-interpolation resample. A no-op when the rates already match (e.g. Android's 16 kHz).</summary>
+    /// <summary>
+    /// Band-limited (windowed-sinc) resample. A no-op when the rates already match (e.g. Android's 16 kHz).
+    /// </summary>
+    /// <remarks>
+    /// This used to be linear interpolation, which is <b>not</b> a usable decimator: iPhone mics run at
+    /// 48 kHz, so reaching 16 kHz throws away two of every three samples, and everything above 8 kHz folds
+    /// back into the speech band as aliasing. Fricatives (/s/, /sh/, /f/) carry most of their energy up
+    /// there, so the fold-back lands right on top of the band the fbank front end measures — and because
+    /// aliasing is signal-dependent, two recordings of the same person are corrupted *differently*, which
+    /// is what pushes their embeddings apart. The anti-alias low-pass is folded into the sinc kernel here,
+    /// so filtering and rate conversion happen in one pass.
+    /// </remarks>
     static float[] Resample(float[] input, int sourceRate, int targetRate)
     {
         if (sourceRate == targetRate || input.Length == 0)
             return input;
 
         var ratio = (double)targetRate / sourceRate;
+
+        // Cut off just under the lower of the two Nyquist limits; when downsampling that IS the anti-alias filter.
+        var cutoff = Math.Min(1.0, ratio) * 0.95;
+        const int zeroCrossings = 24;              // kernel width; more = sharper transition, more cost
+        var half = zeroCrossings / cutoff;         // kernel half-width in input samples
+
         var outLength = (int)(input.Length * ratio);
         var output = new float[outLength];
+
         for (var i = 0; i < outLength; i++)
         {
-            var srcPos = i / ratio;
-            var idx = (int)srcPos;
-            var frac = (float)(srcPos - idx);
-            var a = input[idx];
-            var b = idx + 1 < input.Length ? input[idx + 1] : a;
-            output[i] = a + (b - a) * frac;
+            var center = i / ratio;
+            var lo = (int)Math.Ceiling(center - half);
+            var hi = (int)Math.Floor(center + half);
+
+            double acc = 0;
+            for (var j = lo; j <= hi; j++)
+            {
+                if (j < 0 || j >= input.Length)
+                    continue;
+
+                var d = j - center;
+                var x = d * cutoff;
+                var sinc = Math.Abs(x) < 1e-9 ? 1.0 : Math.Sin(Math.PI * x) / (Math.PI * x);
+                var window = 0.5 * (1.0 + Math.Cos(Math.PI * d / half));   // Hann taper
+                acc += input[j] * sinc * window;
+            }
+
+            output[i] = (float)(acc * cutoff);
         }
         return output;
     }

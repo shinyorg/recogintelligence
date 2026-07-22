@@ -1,9 +1,10 @@
-namespace Sample.Features.Voice;
+namespace Shiny.VoiceIntelligence.Onnx;
 
 /// <summary>
-/// Kaldi-compatible 80-bin log-Mel filterbank matching the WeSpeaker / sherpa-onnx feature pipeline the
-/// bundled speaker model (<c>wespeaker_en_voxceleb_CAM++_LM.onnx</c>) was trained with. Verified
-/// bit-exact (cosine 1.000000) against sherpa-onnx's own extractor on 2–4 s clips.
+/// Kaldi-compatible 80-bin log-Mel filterbank matching the WeSpeaker / sherpa-onnx feature pipeline that
+/// feature-input speaker models (e.g. <c>wespeaker_en_voxceleb_CAM++_LM.onnx</c>) were trained with.
+/// Verified bit-exact (cosine 1.000000) against sherpa-onnx's own extractor on 2–4 s clips, and validated
+/// end-to-end: one TTS voice across two different sentences embeds at 0.138 cosine distance.
 ///
 /// Config (do not "tidy" these — each was pinned by matching the reference extractor):
 /// 25 ms / 10 ms frames, dither = 0, remove-DC, preemphasis 0.97, <b>povey</b> window, power spectrum,
@@ -11,6 +12,9 @@ namespace Sample.Features.Voice;
 /// FLT_EPSILON, <b>snip_edges = false</b> (rounded frame count, frames centred and reflection-padded at
 /// the edges), and <b>no</b> cepstral mean normalization. Input samples are float [-1, 1] and are scaled
 /// to the int16 range because the model's <c>normalize_samples=0</c> metadata says so.
+///
+/// Do <b>not</b> add cepstral mean normalization here — it was measured and made same-speaker distances
+/// worse, on both synthetic and real speech. WeSpeaker feeds the raw fbank to these models.
 /// </summary>
 public static class KaldiFbank
 {
@@ -18,7 +22,8 @@ public static class KaldiFbank
     const int FrameLength = 400;   // 25 ms
     const int FrameShift  = 160;   // 10 ms
     const int NFft        = 512;   // next pow2 of 400
-    const int NumBins     = 80;
+    /// <summary>Number of mel bins produced. Fixed — feature-input speaker models here expect 80.</summary>
+    public const int NumBins = 80;
     const int NumFftBins  = NFft / 2 + 1; // 257
     const float LowFreq   = 20f;
     const float HighFreq  = 7600f; // WeSpeaker/sherpa config (nyquist-400), NOT 8000

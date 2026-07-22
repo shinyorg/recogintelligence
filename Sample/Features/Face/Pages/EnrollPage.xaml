@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:cam="http://shiny.net/maui/camera"
+             xmlns:fi="clr-namespace:Shiny.FaceIntelligence.Maui;assembly=Shiny.FaceIntelligence.Maui"
              xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
              xmlns:vm="clr-namespace:Sample.Features.Face.Pages"
              x:Class="Sample.Features.Face.Pages.EnrollPage"
@@ -15,17 +15,17 @@
     </ContentPage.ToolbarItems>
 
     <Grid RowDefinitions="*,Auto">
-        <!-- Live preview only, for framing. No FaceAnalyzer: the face is found by the ONNX detector on the
-             captured still (in EnrollViewModel.Process), not by the camera's frame analysis. -->
-        <cam:CameraView x:Name="Camera"
-                        Grid.Row="0"
-                        Facing="Front"
-                        ScaleMode="AspectFill" />
+        <!-- The wizard: prompts, per-step gating and the instruction overlay all live in the control. It
+             enrolls from the analyzed frame, so templates match what recognition sees. -->
+        <fi:FaceEnrollmentView x:Name="FaceCamera"
+                               Grid.Row="0"
+                               PersonName="{Binding Name}"
+                               Completed="OnCompleted"
+                               CameraFailed="OnCameraFailed" />
 
         <VerticalStackLayout Grid.Row="1" Padding="16" Spacing="10">
             <Entry Text="{Binding Name}" Placeholder="Name" ReturnType="Done" />
-            <Button Text="Capture &amp; Enroll"
-                    Clicked="OnEnrollClicked" />
+            <Button Text="Start guided enrollment" Clicked="OnStartClicked" />
             <Label Text="{Binding StatusText}"
                    HorizontalTextAlignment="Center" />
         </VerticalStackLayout>

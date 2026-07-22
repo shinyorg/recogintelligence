@@ -13,24 +13,60 @@
                      shiny:Navigate.RelativeNavigation="False" />
     </ContentPage.ToolbarItems>
 
+    <!-- A wizard, not a single Enroll button: the session keeps asking for sentences until the recordings
+         it has kept agree closely enough with each other. It decides when that is, not this page. -->
     <VerticalStackLayout Padding="24" Spacing="16" VerticalOptions="Center">
-        <Entry Text="{Binding Name}" Placeholder="Name" ReturnType="Done" IsEnabled="{Binding IsIdle}" />
 
-        <!-- Read-aloud prompt. The model is text-independent, so this is a phonetically rich sentence
-             (not a passphrase) to get a stronger voiceprint; the VM rotates it each recording. -->
-        <Border Padding="16" StrokeThickness="1" StrokeShape="RoundRectangle 12">
+        <Entry Text="{Binding Name}"
+               Placeholder="Name"
+               ReturnType="Done"
+               IsVisible="{Binding IsNotEnrolling}"
+               IsEnabled="{Binding IsIdle}" />
+
+        <Button Text="Start voice enrollment"
+                Command="{Binding StartCommand}"
+                IsVisible="{Binding IsNotEnrolling}" />
+
+        <!-- Read-aloud prompt. The model is text-independent, so these are phonetically rich sentences
+             (not passphrases) and nothing verifies they were read — they exist to exercise more sounds and
+             to keep the person talking for the whole window. The session rotates them every attempt. -->
+        <Border Padding="16"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 12"
+                IsVisible="{Binding IsEnrolling}">
             <VerticalStackLayout Spacing="6">
                 <Label Text="READ ALOUD WHILE RECORDING" FontSize="12" Opacity="0.6" />
                 <Label Text="{Binding PromptText}" FontSize="20" FontAttributes="Bold" />
             </VerticalStackLayout>
         </Border>
 
-        <Button Text="Record &amp; Enroll"
+        <Button Text="Record"
                 Command="{Binding RecordCommand}"
+                IsVisible="{Binding IsEnrolling}"
                 IsEnabled="{Binding IsIdle}" />
+
+        <ProgressBar Progress="{Binding Progress}" IsVisible="{Binding IsEnrolling}" />
+        <Label Text="{Binding ProgressText}"
+               FontSize="12"
+               Opacity="0.6"
+               HorizontalTextAlignment="Center"
+               IsVisible="{Binding IsEnrolling}" />
+
         <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+
+        <!-- Rejection guidance ("too quiet", "that didn't sound like your other recordings"). -->
+        <Label Text="{Binding HintText}"
+               TextColor="#D08A20"
+               FontAttributes="Bold"
+               HorizontalTextAlignment="Center" />
         <Label Text="{Binding StatusText}" HorizontalTextAlignment="Center" />
-        <Label Text="Tip: speak naturally at a normal distance. Enroll 3–4 times — the prompt changes each time to cover more sounds."
+
+        <Button Text="Cancel"
+                Command="{Binding CancelCommand}"
+                IsVisible="{Binding IsEnrolling}"
+                IsEnabled="{Binding IsIdle}" />
+
+        <Label Text="Tip: same room, same distance from the mic, speak naturally. Nothing is saved until the wizard finishes."
                FontSize="12" Opacity="0.6" HorizontalTextAlignment="Center" />
     </VerticalStackLayout>
 

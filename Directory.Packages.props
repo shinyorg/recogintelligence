@@ -6,9 +6,9 @@
         <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.1"/>
         <PackageVersion Include="SkiaSharp" Version="4.150.1"/>
         <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10"/>
-        <PackageVersion Include="Shiny.DocumentDb" Version="11.1.0"/>
-        <PackageVersion Include="Shiny.DocumentDb.Sqlite" Version="11.1.0"/>
-        <PackageVersion Include="Shiny.DocumentDb.Sqlite.VectorSupport" Version="11.1.0"/>
+        <PackageVersion Include="Shiny.DocumentDb" Version="11.2.1"/>
+        <PackageVersion Include="Shiny.DocumentDb.Sqlite" Version="11.2.1"/>
+        <PackageVersion Include="Shiny.DocumentDb.Sqlite.VectorSupport" Version="11.2.1"/>
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.2"/>
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.Text.Recognition" Version="119.0.1.7"/>
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.7"/>
