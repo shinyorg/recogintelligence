@@ -172,7 +172,7 @@ public class FaceRecognitionAnalyzer : FrameAnalyzer
 
         this.stableFrames = this.IsSteady(bounds) ? this.stableFrames + 1 : 1;
         this.lastBounds = bounds;
-        var analyzed = new AnalyzedFace(bytes, face.Box, bounds, face.Confidence, this.stableFrames);
+        var analyzed = new AnalyzedFace(bytes, face.Box, bounds, face.Confidence, this.stableFrames, bmp.Width, bmp.Height);
         this.LastFace = analyzed;
         this.Raise(() => this.FaceDetected?.Invoke(this, analyzed));
 

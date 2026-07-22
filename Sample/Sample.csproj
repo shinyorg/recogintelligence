@@ -39,8 +39,11 @@
     <Import Project="..\src\Shiny.VoiceIntelligence.Onnx\build\Shiny.VoiceIntelligence.Onnx.targets"/>
 
     <ItemGroup>
-        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4"/>
-        <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128"/>
+        <!-- Shiny brand icon/splash, taken from ~/Desktop/dev/shiny/art. Declared exactly as the Shiny
+             sample does: PNG source (no Color on MauiIcon — the artwork carries its own background) and the
+             Shiny splash backdrop. -->
+        <MauiIcon Include="Resources\AppIcon\appicon.png" ForegroundFile="Resources\AppIcon\appiconfg.png"/>
+        <MauiSplashScreen Include="Resources\Splash\splash.png" Color="#0B0E17" BaseSize="200,200"/>
         <MauiImage Include="Resources\Images\*"/>
         <MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185"/>
         <MauiFont Include="Resources\Fonts\*"/>

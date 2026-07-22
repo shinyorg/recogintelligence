@@ -35,6 +35,7 @@ public class FaceRecognitionView : ContentView
     readonly CameraView camera;
     FaceRecognitionAnalyzer? analyzer;
     bool started;
+    Page? hostPage;
 
     public FaceRecognitionView()
     {
@@ -47,8 +48,19 @@ public class FaceRecognitionView : ContentView
 
         // Whichever of these lands last actually starts the camera; StartCameraAsync is idempotent.
         this.camera.HandlerChanged += (_, _) => this.Start();
-        this.Loaded += (_, _) => this.Start();
+        this.Loaded += (_, _) =>
+        {
+            this.HookHostPage();
+            this.Start();
+        };
         this.Unloaded += (_, _) => this.Stop();
+
+        // Fires *before* the handler is torn down, unlike Unloaded — see Stop().
+        this.HandlerChanging += (_, e) =>
+        {
+            if (e.NewHandler is null)
+                this.Stop();
+        };
     }
 
     /// <summary>Raised on the UI thread for every recognition attempt, including a no-match.</summary>
@@ -124,6 +136,25 @@ public class FaceRecognitionView : ContentView
         return await intelligence.Enroll(name, face.ImageData, face.Box, ct).ConfigureAwait(false);
     }
 
+    /// <summary>Subscribe to the containing page's Disappearing — the earliest reliable teardown signal.</summary>
+    void HookHostPage()
+    {
+        if (this.hostPage is not null)
+            return;
+
+        Element? element = this;
+        while (element is not null and not Page)
+            element = element.Parent;
+
+        if (element is Page page)
+        {
+            this.hostPage = page;
+            page.Disappearing += this.OnHostPageDisappearing;
+        }
+    }
+
+    void OnHostPageDisappearing(object? sender, EventArgs e) => this.Stop();
+
     void Start()
     {
         this.EnsureAnalyzer();
@@ -168,11 +199,38 @@ public class FaceRecognitionView : ContentView
         }
     }
 
-    async void Stop()
+
+    /// <summary>
+    /// Shut the camera down as early as possible, and more than once if need be.
+    /// </summary>
+    /// <remarks>
+    /// The camera pipeline dispatches frame callbacks to the UI thread. If one is still queued when
+    /// navigation disconnects the handler, <c>CameraViewHandler</c> dereferences a null <c>VirtualView</c>
+    /// and throws on the UI thread — an unhandled exception, so the app aborts (SIGABRT). Waiting for
+    /// <c>Unloaded</c> is too late: the handler is already going away by then. So teardown is driven from
+    /// the host page's <c>Disappearing</c> (earliest), <c>HandlerChanging</c> to null, and <c>Unloaded</c> —
+    /// whichever fires first wins, and Stop is idempotent. Detaching the analyzer first stops new frames
+    /// entering the pipeline at all.
+    /// </remarks>
+    void Stop()
     {
+        if (this.hostPage is { } page)
+        {
+            page.Disappearing -= this.OnHostPageDisappearing;
+            this.hostPage = null;
+        }
+
         if (!this.started)
             return;
         this.started = false;
+
+        // Detach first: no analyzer means no new frames are queued while the session winds down.
+        this.camera.Analyzer = null;
+        _ = this.StopCameraAsync();
+    }
+
+    async Task StopCameraAsync()
+    {
         try
         {
             await this.camera.StopAsync();

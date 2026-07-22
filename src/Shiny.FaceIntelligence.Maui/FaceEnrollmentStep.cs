@@ -26,11 +26,18 @@ namespace Shiny.FaceIntelligence.Maui;
 /// Whether the captured shot must differ from the ones already taken (default <c>true</c>). Set
 /// <c>false</c> for a deliberate second look-straight-ahead shot.
 /// </param>
+/// <param name="Guide">
+/// The "face hole" to draw and align against. When set, the person must fit their face into it before a
+/// shot is taken — which is a real, checkable requirement, unlike the free-text instruction. Moving the
+/// target around the frame also varies the angle the camera sees the face from, so it produces genuine pose
+/// variation instead of hoping the instruction is followed.
+/// </param>
 public record FaceEnrollmentStep(
     string Instruction,
     float MinFaceFraction = 0f,
     float MaxFaceFraction = 1f,
-    bool RequireNovelty = true
+    bool RequireNovelty = true,
+    FaceGuide? Guide = null
 )
 {
     /// <summary>
@@ -40,14 +47,17 @@ public record FaceEnrollmentStep(
     /// </summary>
     public static IReadOnlyList<FaceEnrollmentStep> Default { get; } =
     [
-        new("Look straight at the camera", MinFaceFraction: 0.20f),
-        new("Turn your head slightly left"),
-        new("Turn your head slightly right"),
-        new("Lift your chin slightly"),
-        // The two distance steps are the ones most likely to be unreachable — a phone at arm's length may
-        // never get the face under 35% of the frame — so they are deliberately loose, and StepTimeout skips
-        // them rather than stalling the sequence.
-        new("Move closer to the camera", MinFaceFraction: 0.40f),
-        new("Move back a little", MaxFaceFraction: 0.35f)
+        new("Fit your face in the outline", Guide: new FaceGuide(0.50f, 0.50f, 0.55f)),
+
+        // Off-centre targets: the person physically moves, so the camera sees the face from a different
+        // angle. That is pose variation we can actually verify, unlike "turn your head slightly left".
+        new("Now move into the outline on the left", Guide: new FaceGuide(0.30f, 0.48f, 0.52f)),
+        new("And the outline on the right", Guide: new FaceGuide(0.70f, 0.48f, 0.52f)),
+        new("Now the outline near the top", Guide: new FaceGuide(0.50f, 0.32f, 0.50f)),
+
+        // Distance steps. Deliberately loose — a phone at arm's length may never make the face small enough —
+        // and StepTimeout skips them rather than stalling the sequence.
+        new("Move closer — fill the big outline", Guide: new FaceGuide(0.50f, 0.50f, 0.72f, SizeTolerance: 0.3f)),
+        new("Move back — fit the small outline", Guide: new FaceGuide(0.50f, 0.50f, 0.36f, SizeTolerance: 0.35f))
     ];
 }

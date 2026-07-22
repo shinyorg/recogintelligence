@@ -12,4 +12,20 @@ namespace Shiny.FaceIntelligence.Maui;
 /// <param name="Bounds">The same region normalized (0..1) — matches <c>OverlayBox</c> geometry.</param>
 /// <param name="Confidence">The detector's confidence, 0..1.</param>
 /// <param name="StableFrames">How many consecutive frames the face had held steady when this was captured.</param>
-public record AnalyzedFace(byte[] ImageData, FaceBox Box, RectF Bounds, float Confidence, int StableFrames);
+/// <param name="ImageWidth">Width of the analyzed (upright, downscaled) frame in pixels.</param>
+/// <param name="ImageHeight">Height of the analyzed frame in pixels.</param>
+public record AnalyzedFace(
+    byte[] ImageData,
+    FaceBox Box,
+    RectF Bounds,
+    float Confidence,
+    int StableFrames,
+    int ImageWidth = 0,
+    int ImageHeight = 0)
+{
+    /// <summary>
+    /// Frame aspect ratio (width / height), needed to map normalized image coordinates into an AspectFill
+    /// preview. Falls back to 3:4 when the dimensions weren't supplied.
+    /// </summary>
+    public float Aspect => this.ImageHeight > 0 ? this.ImageWidth / (float)this.ImageHeight : 0.75f;
+}

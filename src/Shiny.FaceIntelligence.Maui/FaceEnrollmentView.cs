@@ -38,6 +38,8 @@ namespace Shiny.FaceIntelligence.Maui;
 public class FaceEnrollmentView : ContentView
 {
     readonly CameraView camera;
+    readonly GraphicsView guideOverlay;
+    readonly FaceGuideDrawable guideDrawable = new();
     readonly Label instructionLabel;
     readonly Label hintLabel;
     readonly Label progressLabel;
@@ -50,6 +52,7 @@ public class FaceEnrollmentView : ContentView
     IFaceEmbedder? embedder;
     IFaceIntelligence? intelligence;
     bool started;
+    Page? hostPage;
     bool running;
     bool evaluating;
     int stepIndex;
@@ -100,11 +103,29 @@ public class FaceEnrollmentView : ContentView
             }
         };
 
-        this.Content = new Grid { Children = { this.camera, banner } };
+        // The face-hole overlay sits directly on the preview, under the instruction banner.
+        this.guideOverlay = new GraphicsView
+        {
+            Drawable = this.guideDrawable,
+            InputTransparent = true
+        };
+
+        this.Content = new Grid { Children = { this.camera, this.guideOverlay, banner } };
 
         this.camera.HandlerChanged += (_, _) => this.Start();
-        this.Loaded += (_, _) => this.Start();
+        this.Loaded += (_, _) =>
+        {
+            this.HookHostPage();
+            this.Start();
+        };
         this.Unloaded += (_, _) => this.Stop();
+
+        // Fires *before* the handler is torn down, unlike Unloaded — see Stop().
+        this.HandlerChanging += (_, e) =>
+        {
+            if (e.NewHandler is null)
+                this.Stop();
+        };
     }
 
     /// <summary>Name to enroll the captured shots under. Enrollment won't start until this is set.</summary>
@@ -208,6 +229,11 @@ public class FaceEnrollmentView : ContentView
     {
         this.armed = false;
         this.countdownRemaining = Math.Max(1, (int)Math.Ceiling(this.StepCountdown.TotalSeconds));
+        // The concrete guide is recomputed per frame (it depends on the frame aspect); this just clears any
+        // stale outline from the previous step until the next detection arrives.
+        this.guideDrawable.Guide = null;
+        this.guideDrawable.IsAligned = false;
+        this.guideOverlay.Invalidate();
         this.ReportProgress();
         this.hintLabel.Text = $"Get ready… {this.countdownRemaining}";
 
@@ -257,12 +283,34 @@ public class FaceEnrollmentView : ContentView
         this.running = false;
         this.armed = false;
         this.countdownTimer?.Stop();
+        this.guideDrawable.Guide = null;
+        this.guideDrawable.Face = null;
+        this.guideOverlay.Invalidate();
         this.captured.Clear();
         this.capturedEmbeddings.Clear();
         this.instructionLabel.Text = String.Empty;
         this.hintLabel.Text = String.Empty;
         this.progressLabel.Text = String.Empty;
     }
+
+    /// <summary>Subscribe to the containing page's Disappearing — the earliest reliable teardown signal.</summary>
+    void HookHostPage()
+    {
+        if (this.hostPage is not null)
+            return;
+
+        Element? element = this;
+        while (element is not null and not Page)
+            element = element.Parent;
+
+        if (element is Page page)
+        {
+            this.hostPage = page;
+            page.Disappearing += this.OnHostPageDisappearing;
+        }
+    }
+
+    void OnHostPageDisappearing(object? sender, EventArgs e) => this.Stop();
 
     void Start()
     {
@@ -289,7 +337,13 @@ public class FaceEnrollmentView : ContentView
             $"intelligence={(this.intelligence is null ? "NULL - nothing can be stored!" : "ok")}");
         this.analyzer.RecognitionEnabled = false;
         this.analyzer.FaceDetected += this.OnFaceDetected;
-        this.analyzer.FaceLost += (_, _) => this.SetHint(FaceEnrollmentRejection.NoFace);
+        this.analyzer.FaceLost += (_, _) =>
+        {
+            this.guideDrawable.Face = null;
+            this.guideDrawable.IsAligned = false;
+            this.guideOverlay.Invalidate();
+            this.SetHint(FaceEnrollmentRejection.NoFace);
+        };
         this.camera.Analyzer = this.analyzer;
     }
 
@@ -317,24 +371,74 @@ public class FaceEnrollmentView : ContentView
         }
     }
 
-    async void Stop()
+
+    /// <summary>
+    /// Shut the camera down as early as possible, and more than once if need be.
+    /// </summary>
+    /// <remarks>
+    /// The camera pipeline dispatches frame callbacks to the UI thread. If one is still queued when
+    /// navigation disconnects the handler, <c>CameraViewHandler</c> dereferences a null <c>VirtualView</c>
+    /// and throws on the UI thread — an unhandled exception, so the app aborts (SIGABRT). Waiting for
+    /// <c>Unloaded</c> is too late: the handler is already going away by then. So teardown is driven from
+    /// the host page's <c>Disappearing</c> (earliest), <c>HandlerChanging</c> to null, and <c>Unloaded</c> —
+    /// whichever fires first wins, and Stop is idempotent. Detaching the analyzer first stops new frames
+    /// entering the pipeline at all.
+    /// </remarks>
+    void Stop()
     {
+        if (this.hostPage is { } page)
+        {
+            page.Disappearing -= this.OnHostPageDisappearing;
+            this.hostPage = null;
+        }
+
+        // Stop the sequence too: a countdown ticking into a torn-down view is the same class of bug.
+        this.running = false;
+        this.armed = false;
+        this.countdownTimer?.Stop();
+
         if (!this.started)
             return;
         this.started = false;
+
+        // Detach first: no analyzer means no new frames are queued while the session winds down.
+        this.camera.Analyzer = null;
+        _ = this.StopCameraAsync();
+    }
+
+    async Task StopCameraAsync()
+    {
         try
         {
             await this.camera.StopAsync();
         }
         catch
         {
-            // Stopping a camera that's already gone isn't worth surfacing.
+            // Tearing down a camera that's already gone isn't worth surfacing.
         }
     }
 
     void OnFaceDetected(object? sender, AnalyzedFace face)
     {
-        if (!this.running || this.evaluating || this.stepIndex >= this.Steps.Count)
+        if (!this.running || this.stepIndex >= this.Steps.Count)
+        {
+            this.guideDrawable.Face = null;
+            this.guideOverlay.Invalidate();
+            return;
+        }
+
+        var currentStep = this.Steps[this.stepIndex];
+        var guide = this.EffectiveGuide(currentStep, face.Aspect);
+
+        // Repaint the guide every frame so the outline tracks the face and turns green on a fit — this runs
+        // even while an evaluation is in flight, otherwise the feedback visibly stalls.
+        this.guideDrawable.Face = face.Bounds;
+        this.guideDrawable.ImageAspect = face.Aspect;
+        this.guideDrawable.Guide = guide;
+        this.guideDrawable.IsAligned = guide?.IsAligned(face.Bounds) ?? true;
+        this.guideOverlay.Invalidate();
+
+        if (this.evaluating)
             return;
 
         // The countdown must have finished — until then the person is still reading and moving.
@@ -349,7 +453,15 @@ public class FaceEnrollmentView : ContentView
             return;
         }
 
-        var step = this.Steps[this.stepIndex];
+        var step = currentStep;
+
+        // Fitting the outline is the one guided requirement that is actually checkable, so it gates first
+        // and its correction text is more useful than a generic "too far".
+        if (guide is not null && !guide.IsAligned(face.Bounds))
+        {
+            this.hintLabel.Text = guide.Correction(face.Bounds) ?? "Fit your face in the outline";
+            return;
+        }
 
         // Cheap geometric gates first — these run per frame and must not touch the image.
         var fraction = FaceFraction(face);
@@ -483,6 +595,9 @@ public class FaceEnrollmentView : ContentView
         this.running = false;
         this.armed = false;
         this.countdownTimer?.Stop();
+        this.guideDrawable.Guide = null;
+        this.guideDrawable.Face = null;
+        this.guideOverlay.Invalidate();
 
         var minPair = 1f;
         for (var i = 0; i < this.capturedEmbeddings.Count; i++)
@@ -544,6 +659,23 @@ public class FaceEnrollmentView : ContentView
             this.hintLabel.Text = hint;
             this.Rejected?.Invoke(this, new FaceEnrollmentRejected(reason, hint));
         }
+    }
+
+    /// <summary>
+    /// The step's guide expressed in image space. Guides are authored against the <b>visible</b> preview, so
+    /// they have to be re-projected through the AspectFill crop before they can be compared with detections.
+    /// </summary>
+    FaceGuide? EffectiveGuide(FaceEnrollmentStep step, float imageAspect)
+    {
+        if (step.Guide is not { } guide)
+            return null;
+
+        var w = this.guideOverlay.Width > 0 ? this.guideOverlay.Width : this.Width;
+        var h = this.guideOverlay.Height > 0 ? this.guideOverlay.Height : this.Height;
+        if (w <= 0 || h <= 0)
+            return guide;
+
+        return guide.ToImageSpace(imageAspect, (float)(w / h));
     }
 
     /// <summary>Face size as a fraction of the frame's shorter side — the scale-independent "how close" measure.</summary>

@@ -176,7 +176,8 @@ Both resolve their services from `Handler.MauiContext.Services`, so neither need
 
 | Gate | Verifiable? | Notes |
 |---|---|---|
-| Face size vs frame (`MinFaceFraction`/`MaxFaceFraction`) | yes | drives the "move closer"/"move back" steps |
+| Fitting the target oval (`FaceGuide`) | yes | position **and** size; the primary gate — see [the overlay section](#the-enrollment-face-hole-overlay-and-the-aspectfill-trap) |
+| Face size vs frame (`MinFaceFraction`/`MaxFaceFraction`) | yes | older, coarser distance gate; still honoured |
 | Steadiness (`RequiredStableFrames`) | yes | reuses the analyzer's stability counter |
 | Sharpness + brightness (`FrameQuality`) | yes | variance-of-Laplacian at a fixed 96×96 working size so the threshold is scale-independent |
 | **Novelty** (`MinNoveltyDistance`, default 0.06) | yes | embeds the candidate and rejects it if within that cosine distance of any shot already captured |
@@ -184,9 +185,27 @@ Both resolve their services from `Handler.MauiContext.Services`, so neither need
 
 Novelty is the gate that does the real work. The purpose of a varied gallery *is* embedding spread, so measuring spread directly beats trusting that someone turned their head — it's what stops six near-identical front-on shots. `FaceEnrollmentResult.MinPairwiseDistance` reports the tightest pair so a caller can tell whether the sequence actually achieved variety.
 
+**Storage is incremental, and steps can be skipped.** Each accepted shot is enrolled immediately rather than batched to the end — batching meant one unsatisfiable step (e.g. "move back" when a phone at arm's length can't make the face small enough) discarded every shot already captured, so the person completed five prompts and got nothing. `StepTimeout` (12 s) skips a step that can't be satisfied and `FaceEnrollmentResult.SkippedSteps` reports it. Consequently `CancelEnrollment` no longer discards anything — use `Forget` to undo.
+
+**Pacing is a visible countdown**, not a silent delay: `StepCountdown` (3 s) shows "Get ready… 3/2/1" then "Hold still…", and captures are only accepted after it. A wizard that fires before the instruction can be read just takes N shots of whatever was already in frame — the first cut completed all six steps in about six frames.
+
+**`MinNoveltyDistance` must clear the model's frame-to-frame jitter.** It defaults to 0.18. The first attempt used 0.06, which is *inside* the noise: the same face measured 0.084–0.526 apart across seconds on this device, so every frame read as "novel". Measured gate output at 0.18 shows it discriminating properly (`nearest 0.1298` rejected, `0.2184` accepted).
+
 Per-frame cost is kept off the UI thread and single-flight: cheap geometric gates run inline on the analyzer's new `FaceDetected` event, and only once those pass does the control decode/measure/embed inside a `Task.Run` (`evaluating` guards re-entry). Enrollment uses the box-based `Enroll(name, imageData, box)` on the analyzed frame, so templates and probes share preprocessing. Shots after the first are enrolled without the duplicate gate — the sequence is explicitly one person, and shots 2..n *should* match shot 1.
 
 Adding real pose verification later means a landmark/head-pose model behind a new seam; that would also unlock the 5-point alignment TODO. Until then, don't write code that claims to check angle.
+
+### The enrollment "face hole" overlay, and the AspectFill trap
+
+`FaceEnrollmentView` layers a `GraphicsView` (`FaceGuideDrawable`) over the `CameraView`: everything outside the step's target oval is dimmed, the outline is amber-dashed when off-target and solid green the moment the face fits, and the live detection is drawn as a faint box so the person can see which way to move. `FaceGuide.Correction(...)` turns a miss into a directional hint ("Move left into the outline", "Move closer — fill the outline").
+
+**This is what makes guided steps checkable.** Head angle can't be verified (no landmarks), but "is the face inside this oval at roughly this size" is plain geometry. Moving the *target* around the frame also produces genuine pose variation — the person physically moves, so the camera sees them from a different angle — which is why the default sequence is now outline positions (centre / left / right / top / big / small) rather than "turn your head slightly left". Alignment gates capture before the quality and novelty checks.
+
+**The trap: guides are authored in VISIBLE-preview coordinates, not full-frame coordinates.** The preview is AspectFill, so the frame is scaled to *cover* the view and the overflow is cropped — a 720×1280 analyzed frame in a 393×490 view renders 393×699 and loses ~200 px vertically. Guides written in full-frame normalized coords therefore render oversized and clipped off-screen, because the cropped-away region still counts toward "1.0". `FaceGuide.ToImageSpace(imageAspect, viewAspect)` re-projects a visible-space guide into the full-frame space detections arrive in; `FaceEnrollmentView.EffectiveGuide(...)` calls it per frame with the live view aspect. Verified on-device — before the fix the oval ran off the top-left and covered ~76% of the preview height instead of 52%.
+
+Two related details that are easy to get wrong the same way:
+- **Oval width is derived in view pixels, not normalized units.** `FaceGuide.AspectRatio` (0.78) multiplies the oval's *pixel* height. Deriving a normalized width from a normalized height conflates the axes and draws a squashed oval on any non-square frame.
+- **`AnalyzedFace` carries `ImageWidth`/`ImageHeight`** (hence `Aspect`) precisely so the overlay can do this mapping; without them there is no way to reproduce the AspectFill transform.
 
 ### Critical gotcha: `CameraView` silently no-ops before its handler connects
 
