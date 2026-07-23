@@ -9,7 +9,9 @@ namespace Shiny.DocumentIntelligence;
 /// <summary>
 /// Android OCR backed by ML Kit Text Recognition (binds <c>play-services-mlkit-text-recognition</c>). Decodes
 /// the page bytes to a <see cref="Bitmap"/>, runs the on-device Latin recognizer, and flattens the
-/// block/line structure to <see cref="RecognizedText"/> in reading order.
+/// block/line structure to <see cref="RecognizedText"/>. Each line keeps its bounding box, so
+/// <see cref="RecognizedText.FromLines"/> imposes reading order (ML Kit's block order isn't it) and groups
+/// lines split across a column gap back into one row.
 /// </summary>
 public class TextRecognizer : ITextRecognizer
 {
@@ -32,6 +34,9 @@ public class TextRecognizer : ITextRecognizer
         if (text?.TextBlocks is null)
             return RecognizedText.Empty;
 
+        // Captured before the bitmap goes out of scope: ML Kit reports pixel rects against this image.
+        float imageWidth = bitmap.Width, imageHeight = bitmap.Height;
+
         var lines = new List<RecognizedLine>();
         foreach (var block in text.TextBlocks)
         {
@@ -40,9 +45,15 @@ public class TextRecognizer : ITextRecognizer
             foreach (var line in tb.Lines)
             {
                 if (line is Text.Line l && !String.IsNullOrEmpty(l.Text))
-                    lines.Add(new RecognizedLine(l.Text, l.Confidence));
+                    lines.Add(new RecognizedLine(l.Text, l.Confidence, ToBounds(l.BoundingBox, imageWidth, imageHeight)));
             }
         }
         return RecognizedText.FromLines(lines);
     }
+
+    /// <summary>ML Kit reports pixel rects against the input bitmap; <see cref="TextBounds"/> is normalized.</summary>
+    static TextBounds? ToBounds(Rect? rect, float imageWidth, float imageHeight) =>
+        rect is null || imageWidth <= 0f || imageHeight <= 0f
+            ? null
+            : new TextBounds(rect.Left / imageWidth, rect.Top / imageHeight, rect.Width() / imageWidth, rect.Height() / imageHeight);
 }

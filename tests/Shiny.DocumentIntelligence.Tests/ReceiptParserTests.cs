@@ -97,6 +97,78 @@ public class ReceiptParserTests
         Assert.Equal("USD", r.Currency); // no symbol present — detected from the trailing ISO code
     }
 
+    // A real receipt, captured on-device and OCR'd through the actual Vision + row-grouping pipeline, then
+    // pasted verbatim (OCR misreads and all). Its items put the SKU, quantity and unit/line price on one row
+    // with the product name on the *next* — the layout that used to yield zero line items.
+    const string RealRetailReceipt =
+        "GARAGE\n" +
+        "419 King Street West Garage 140\n" +
+        "Oshawa, ON L1J2K5\n" +
+        "Jul 22, 2026, 2:09:15 PM\n" +
+        "Loyalty Number 1204843528\n" +
+        "IN-STORE PURCHASES\n" +
+        "0979327 69.95 69.95\n" +
+        "Millie Linen Pull-On ||\n" +
+        "S/1MM ANISE FLOWER || ANISE FLOWER\n" +
+        "0915812 1 34.95 34.95\n" +
+        "Steek Crewneck T-Shi\n" +
+        "M/ON BRIGHT WHITE |1 BRIGHT WHITE\n" +
+        "Total Items Purchased 3\n" +
+        "Total Purchased Price 105.00\n" +
+        "TOTALS\n" +
+        "Subtotal 105.00\n" +
+        "Total Taxes 13.65\n" +
+        "13.00% GST/HST #135968980 13.65\n" +
+        "Total 118.65\n" +
+        "Debit SETTLED 118.65\n" +
+        "Account Debit ending 8684\n" +
+        "Approval JDPJ3P89BJDQ9S25\n";
+
+    [Fact]
+    public void RealReceipt_TakesTheDescriptionFromTheRowBelowTheAmount()
+    {
+        var r = ReceiptParser.Parse(RealRetailReceipt);
+
+        Assert.Contains(r.Items, i => i.Description == "Millie Linen Pull-On" && i.Amount == 69.95m);
+        Assert.Contains(r.Items, i => i.Description == "Steek Crewneck T-Shi" && i.Amount == 34.95m);
+    }
+
+    [Fact]
+    public void RealReceipt_TotalsAreNotMistakenForItems()
+    {
+        var r = ReceiptParser.Parse(RealRetailReceipt);
+
+        // The tender line, the tax line and both "Total …" decoys carry amounts but are not purchases.
+        Assert.DoesNotContain(r.Items, i => i.Amount is 118.65m or 13.65m or 105.00m);
+        Assert.Equal(118.65m, r.Total);
+        Assert.Equal(105.00m, r.Subtotal);
+        Assert.Equal(13.65m, r.Tax);
+        Assert.Equal("GARAGE", r.Merchant);
+        Assert.Equal(new DateOnly(2026, 7, 22), r.Date);
+    }
+
+    [Fact]
+    public void BorrowedDescription_StopsAtTheNextAmountRow()
+    {
+        // Two bare SKU rows back to back: the second is the next item, not the first one's description,
+        // so the first must not adopt it.
+        var r = ReceiptParser.Parse("SHOP\n0979327 69.95\n0915812 34.95\nWidget Deluxe\n");
+
+        Assert.Single(r.Items);
+        Assert.Equal("Widget Deluxe", r.Items[0].Description);
+        Assert.Equal(34.95m, r.Items[0].Amount);
+    }
+
+    [Fact]
+    public void GroupedAmount_IsStrippedFromTheDescription()
+    {
+        // "1,299.00" never matches its decimal's "0.00" rendering, so the old cut-at-the-value approach left
+        // the amount sitting in the description.
+        var r = ReceiptParser.Parse("ELECTRONICS CO\nLaptop 1,299.00\nTotal 1,402.92\n");
+
+        Assert.Contains(r.Items, i => i.Description == "Laptop" && i.Amount == 1299.00m);
+    }
+
     [Fact]
     public void Total_TakesBottomMostWhenAQualifyingDecoyHasAnAmount()
     {

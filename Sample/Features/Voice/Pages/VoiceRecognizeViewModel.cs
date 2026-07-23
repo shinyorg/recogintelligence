@@ -45,7 +45,7 @@ public partial class VoiceRecognizeViewModel(IVoiceIntelligence voice, VoiceReco
 
             var result = await voice.Recognize(samples);
             this.ResultText = result.IsMatch
-                ? $"{result.Name}  ·  {result.Similarity:P0}"
+                ? $"{result.PersonIdentifier}  ·  {result.Similarity:P0}"
                 : "Unknown speaker";
 
             var diag = $"nearest distance {result.Distance:F3} (threshold {VoiceTuning.MaxDistance:F2}) · {Describe(samples)}";

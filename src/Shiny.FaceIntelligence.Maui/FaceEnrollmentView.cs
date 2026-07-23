@@ -13,7 +13,7 @@ namespace Shiny.FaceIntelligence.Maui;
 /// </summary>
 /// <example>
 /// <code language="xml">
-/// &lt;fi:FaceEnrollmentView PersonName="{Binding Name}" Completed="OnEnrolled" /&gt;
+/// &lt;fi:FaceEnrollmentView PersonIdentifier="{Binding Name}" Completed="OnEnrolled" /&gt;
 /// </code>
 /// </example>
 /// <remarks>
@@ -128,15 +128,18 @@ public class FaceEnrollmentView : ContentView
         };
     }
 
-    /// <summary>Name to enroll the captured shots under. Enrollment won't start until this is set.</summary>
-    public static readonly BindableProperty PersonNameProperty = BindableProperty.Create(
-        nameof(PersonName), typeof(string), typeof(FaceEnrollmentView));
+    /// <summary>
+    /// Identity to enroll the captured shots under — an opaque caller-chosen key, see
+    /// <see cref="Person.PersonIdentifier"/>. Enrollment won't start until this is set.
+    /// </summary>
+    public static readonly BindableProperty PersonIdentifierProperty = BindableProperty.Create(
+        nameof(PersonIdentifier), typeof(string), typeof(FaceEnrollmentView));
 
-    /// <inheritdoc cref="PersonNameProperty"/>
-    public string? PersonName
+    /// <inheritdoc cref="PersonIdentifierProperty"/>
+    public string? PersonIdentifier
     {
-        get => (string?)this.GetValue(PersonNameProperty);
-        set => this.SetValue(PersonNameProperty, value);
+        get => (string?)this.GetValue(PersonIdentifierProperty);
+        set => this.SetValue(PersonIdentifierProperty, value);
     }
 
     /// <summary>The prompt sequence. Defaults to <see cref="FaceEnrollmentStep.Default"/>.</summary>
@@ -207,12 +210,12 @@ public class FaceEnrollmentView : ContentView
     public bool IsRunning => this.running;
 
     /// <summary>
-    /// Begin (or restart) the guided sequence. Requires <see cref="PersonName"/>; throws if it's blank.
+    /// Begin (or restart) the guided sequence. Requires <see cref="PersonIdentifier"/>; throws if it's blank.
     /// </summary>
     public void BeginEnrollment()
     {
-        if (String.IsNullOrWhiteSpace(this.PersonName))
-            throw new InvalidOperationException($"Set {nameof(this.PersonName)} before starting enrollment.");
+        if (String.IsNullOrWhiteSpace(this.PersonIdentifier))
+            throw new InvalidOperationException($"Set {nameof(this.PersonIdentifier)} before starting enrollment.");
         if (this.Steps.Count == 0)
             throw new InvalidOperationException("The enrollment sequence has no steps.");
 
@@ -560,10 +563,10 @@ public class FaceEnrollmentView : ContentView
     /// <summary>Store one accepted shot straight away. Returns false (and reports) if it couldn't be stored.</summary>
     async Task<bool> StoreAsync(AnalyzedFace shot)
     {
-        var name = this.PersonName?.Trim();
-        if (String.IsNullOrWhiteSpace(name))
+        var id = this.PersonIdentifier?.Trim();
+        if (String.IsNullOrWhiteSpace(id))
         {
-            this.Fail("Nothing stored — PersonName is empty.");
+            this.Fail("Nothing stored — PersonIdentifier is empty.");
             return false;
         }
 
@@ -579,8 +582,8 @@ public class FaceEnrollmentView : ContentView
         {
             // The box-based overload: no re-detection, and no duplicate gate — the sequence is explicitly one
             // person, so shots 2..n are *expected* to match shot 1.
-            this.people.Add(await store.Enroll(name, shot.ImageData, shot.Box));
-            Console.WriteLine($"[Enroll] stored shot {this.people.Count} for '{name}'");
+            this.people.Add(await store.Enroll(id, shot.ImageData, shot.Box));
+            Console.WriteLine($"[Enroll] stored shot {this.people.Count} for '{id}'");
             return true;
         }
         catch (Exception ex)
@@ -604,14 +607,14 @@ public class FaceEnrollmentView : ContentView
             for (var j = i + 1; j < this.capturedEmbeddings.Count; j++)
                 minPair = MathF.Min(minPair, Distance(this.capturedEmbeddings[i], this.capturedEmbeddings[j]));
 
-        var name = this.PersonName?.Trim() ?? String.Empty;
+        var id = this.PersonIdentifier?.Trim() ?? String.Empty;
         var skipped = this.Steps.Count - this.captured.Count;
         Console.WriteLine($"[Enroll] done: {this.people.Count} stored, {skipped} skipped, min pairwise {minPair:F3}");
 
-        this.instructionLabel.Text = $"Enrolled {this.people.Count} shots for {name}";
+        this.instructionLabel.Text = $"Enrolled {this.people.Count} shots for {id}";
         this.hintLabel.Text = skipped > 0 ? $"{skipped} step(s) skipped" : String.Empty;
         this.Completed?.Invoke(this, new FaceEnrollmentResult(
-            name, this.people.ToList(), this.capturedEmbeddings.Count > 1 ? minPair : 0f, skipped));
+            id, this.people.ToList(), this.capturedEmbeddings.Count > 1 ? minPair : 0f, skipped));
     }
 
     /// <summary>Surface a failure rather than ending the sequence quietly with nothing saved.</summary>

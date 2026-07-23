@@ -31,6 +31,6 @@ public class DocumentDbVoiceStore(IDocumentStore store) : IVoiceStore
     public Task<IReadOnlyList<Speaker>> GetAll(CancellationToken ct = default)
         => store.Query<Speaker>().OrderByDescending(p => p.EnrolledAt).ToList(ct);
 
-    public Task<int> RemoveByName(string name, CancellationToken ct = default)
-        => store.Query<Speaker>().Where(p => p.Name == name).ExecuteDelete(ct);
+    public Task<int> RemoveByPersonIdentifier(string personIdentifier, CancellationToken ct = default)
+        => store.Query<Speaker>().Where(s => s.PersonIdentifier == personIdentifier).ExecuteDelete(ct);
 }

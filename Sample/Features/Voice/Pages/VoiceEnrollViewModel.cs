@@ -145,8 +145,8 @@ public partial class VoiceEnrollViewModel(IVoiceIntelligence voice, VoiceRecorde
             this.session = null;
             this.PromptText = "";
             this.StatusText = result.IsConfident
-                ? $"Done — '{result.Name}' enrolled from {result.Speakers.Count} recordings (agreement {result.Cohesion:F2})."
-                : $"Enrolled '{result.Name}' from {result.Speakers.Count} recordings, but they varied more than ideal " +
+                ? $"Done — '{result.PersonIdentifier}' enrolled from {result.Speakers.Count} recordings (agreement {result.Cohesion:F2})."
+                : $"Enrolled '{result.PersonIdentifier}' from {result.Speakers.Count} recordings, but they varied more than ideal " +
                   $"(agreement {result.Cohesion:F2}). Re-enroll somewhere quieter if recognition is unreliable.";
             return;
         }

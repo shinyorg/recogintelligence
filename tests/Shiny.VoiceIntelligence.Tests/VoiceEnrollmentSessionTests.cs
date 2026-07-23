@@ -101,7 +101,7 @@ public class VoiceEnrollmentSessionTests : IDisposable
 
         var stored = await voice.GetAll();
         Assert.Equal(3, stored.Count);
-        Assert.All(stored, s => Assert.Equal("Allan", s.Name));
+        Assert.All(stored, s => Assert.Equal("Allan", s.PersonIdentifier));
     }
 
     [Fact]

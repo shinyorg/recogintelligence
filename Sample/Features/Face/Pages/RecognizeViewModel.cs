@@ -30,7 +30,7 @@ public partial class RecognizeViewModel(ILogger<RecognizeViewModel> logger) : Ob
     public void Show(FaceRecognizedEventArgs e)
     {
         this.ResultText = e.Result.IsMatch
-            ? $"{e.Result.Name}  ·  {e.Result.Similarity:P0}"
+            ? $"{e.Result.PersonIdentifier}  ·  {e.Result.Similarity:P0}"
             : "Unknown face";
 
         this.Note(e.Result.IsMatch

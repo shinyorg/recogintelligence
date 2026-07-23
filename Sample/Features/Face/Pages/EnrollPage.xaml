@@ -19,7 +19,7 @@
              enrolls from the analyzed frame, so templates match what recognition sees. -->
         <fi:FaceEnrollmentView x:Name="FaceCamera"
                                Grid.Row="0"
-                               PersonName="{Binding Name}"
+                               PersonIdentifier="{Binding Name}"
                                Completed="OnCompleted"
                                CameraFailed="OnCameraFailed" />
 

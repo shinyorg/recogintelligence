@@ -11,18 +11,18 @@ public class VoiceIntelligenceManager(
     VoiceIntelligenceOptions options
 ) : IVoiceIntelligence
 {
-    public async Task<Speaker> Enroll(string name, float[] samples, CancellationToken ct = default)
+    public async Task<Speaker> Enroll(string personIdentifier, float[] samples, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(personIdentifier);
         ArgumentNullException.ThrowIfNull(samples);
 
         // Embedding (ONNX inference) is synchronous and CPU-bound, and the first embed also loads the model —
         // run it off the caller's thread so awaiting from a UI thread never blocks the UI. See also Recognize.
-        var name2 = name.Trim();
+        var id = personIdentifier.Trim();
         var person = await Task.Run(() => new Speaker
         {
             Id = Guid.NewGuid().ToString("n"), // string ids must be explicit
-            Name = name2,
+            PersonIdentifier = id,
             Embedding = embedder.Embed(samples),
             EnrolledAt = DateTimeOffset.UtcNow
         }, ct);
@@ -36,10 +36,10 @@ public class VoiceIntelligenceManager(
     /// </summary>
     float MaxDistance => options.MaxDistance;
 
-    public VoiceEnrollmentSession CreateEnrollment(string name, VoiceEnrollmentOptions? options = null)
+    public VoiceEnrollmentSession CreateEnrollment(string personIdentifier, VoiceEnrollmentOptions? options = null)
         // The session's distance gates only mean anything relative to the threshold matching actually uses,
         // so the defaults come from this instance's configuration rather than from a constant.
-        => new(name, embedder, store, options ?? VoiceEnrollmentOptions.ForThreshold(this.MaxDistance));
+        => new(personIdentifier, embedder, store, options ?? VoiceEnrollmentOptions.ForThreshold(this.MaxDistance));
 
     public async Task<RecognitionResult> Recognize(float[] samples, CancellationToken ct = default)
     {
@@ -56,14 +56,14 @@ public class VoiceIntelligenceManager(
         var best = hits[0];
         if (best.Distance > options.MaxDistance)
             // A near miss and a total stranger are both "no match", but they mean completely different
-            // things when tuning MaxDistance — so report how close the nearest actually got. Name stays
+            // things when tuning MaxDistance — so report how close the nearest actually got. The identifier stays
             // null, so IsMatch is still false and callers that only check IsMatch are unaffected.
             return new RecognitionResult(null, best.Distance, null);
 
-        return new RecognitionResult(best.Speaker.Name, best.Distance, best.Speaker.Id);
+        return new RecognitionResult(best.Speaker.PersonIdentifier, best.Distance, best.Speaker.Id);
     }
 
     public Task<IReadOnlyList<Speaker>> GetAll(CancellationToken ct = default) => store.GetAll(ct);
 
-    public Task<int> Forget(string name, CancellationToken ct = default) => store.RemoveByName(name, ct);
+    public Task<int> Forget(string personIdentifier, CancellationToken ct = default) => store.RemoveByPersonIdentifier(personIdentifier, ct);
 }

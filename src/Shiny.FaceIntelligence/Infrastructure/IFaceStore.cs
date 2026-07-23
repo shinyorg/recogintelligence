@@ -20,11 +20,11 @@ public interface IFaceStore
     /// <summary>All enrolled people, most-recently enrolled first. One entry per stored shot.</summary>
     Task<IReadOnlyList<Person>> GetAll(CancellationToken ct = default);
 
-    /// <summary>Delete every enrolled shot for a given name. Returns the number removed.</summary>
-    Task<int> RemoveByName(string name, CancellationToken ct = default);
+    /// <summary>Delete every enrolled shot for a given identity. Returns the number removed.</summary>
+    Task<int> RemoveByPersonIdentifier(string personIdentifier, CancellationToken ct = default);
 }
 
 /// <summary>A nearest-neighbor hit: an enrolled <see cref="Person"/> and its distance to the query.</summary>
-/// <param name="Person">The enrolled document (with name, id, thumbnail).</param>
+/// <param name="Person">The enrolled document (with identifier, document id, thumbnail).</param>
 /// <param name="Distance">Distance to the query embedding (cosine: 0 = identical, lower is closer).</param>
 public readonly record struct FaceMatch(Person Person, float Distance);

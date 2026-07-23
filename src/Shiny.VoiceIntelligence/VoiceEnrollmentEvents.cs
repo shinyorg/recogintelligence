@@ -57,7 +57,7 @@ public record VoiceEnrollmentStepResult(
 /// <summary>
 /// A finished enrollment. The stored <see cref="Speakers"/> are already persisted by the time this exists.
 /// </summary>
-/// <param name="Name">The name enrolled under.</param>
+/// <param name="PersonIdentifier">The identity enrolled under.</param>
 /// <param name="Speakers">The stored documents — one per accepted recording.</param>
 /// <param name="Cohesion">
 /// Largest cosine distance between any two stored recordings. The headline quality number: it is how much
@@ -69,7 +69,7 @@ public record VoiceEnrollmentStepResult(
 /// but it's worth re-enrolling somewhere quieter.
 /// </param>
 public record VoiceEnrollmentResult(
-    string Name,
+    string PersonIdentifier,
     IReadOnlyList<Speaker> Speakers,
     float Cohesion,
     bool IsConfident

@@ -20,11 +20,11 @@ public interface IVoiceStore
     /// <summary>All enrolled speakers, most-recently enrolled first. One entry per stored utterance.</summary>
     Task<IReadOnlyList<Speaker>> GetAll(CancellationToken ct = default);
 
-    /// <summary>Delete every enrolled utterance for a given name. Returns the number removed.</summary>
-    Task<int> RemoveByName(string name, CancellationToken ct = default);
+    /// <summary>Delete every enrolled utterance for a given identity. Returns the number removed.</summary>
+    Task<int> RemoveByPersonIdentifier(string personIdentifier, CancellationToken ct = default);
 }
 
 /// <summary>A nearest-neighbor hit: an enrolled <see cref="Speaker"/> and its distance to the query.</summary>
-/// <param name="Speaker">The enrolled document (name, id).</param>
+/// <param name="Speaker">The enrolled document (identifier, document id).</param>
 /// <param name="Distance">Distance to the query embedding (cosine: 0 = identical, lower is closer).</param>
 public readonly record struct VoiceMatch(Speaker Speaker, float Distance);

@@ -92,17 +92,17 @@ public class CombinedStacksTests : IDisposable
         var speakers = await voice.GetAll();
 
         // Each store holds only its own document type + name — no cross-contamination.
-        Assert.Equal(["FacePerson"], people.Select(p => p.Name));
-        Assert.Equal(["VoiceSpeaker"], speakers.Select(s => s.Name));
+        Assert.Equal(["FacePerson"], people.Select(p => p.PersonIdentifier));
+        Assert.Equal(["VoiceSpeaker"], speakers.Select(s => s.PersonIdentifier));
 
         // Each recognizes its own enrolled vector.
         var faceMatch = await face.Recognize(TestFaces.Image(1, 0, 0, 0, 0, 0, 0, 0), new FaceBox(0, 0, 100, 100));
         Assert.True(faceMatch.IsMatch);
-        Assert.Equal("FacePerson", faceMatch.Name);
+        Assert.Equal("FacePerson", faceMatch.PersonIdentifier);
 
         var voiceMatch = await voice.Recognize(Shiny.VoiceIntelligence.Testing.TestVoices.Utterance(1, 0, 0, 0, 0, 0));
         Assert.True(voiceMatch.IsMatch);
-        Assert.Equal("VoiceSpeaker", voiceMatch.Name);
+        Assert.Equal("VoiceSpeaker", voiceMatch.PersonIdentifier);
 
         // The two stacks wrote to their own database files.
         Assert.True(File.Exists(this.faceDb));

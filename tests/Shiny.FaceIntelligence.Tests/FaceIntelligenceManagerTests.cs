@@ -77,8 +77,8 @@ public class FaceIntelligenceManagerTests : IDisposable
         var result = await rec.Recognize(TestFaces.Image(0.98f, 0.2f, 0, 0, 0, 0, 0, 0), AnyBox);
 
         Assert.True(result.IsMatch);
-        Assert.Equal("Allan", result.Name);
-        Assert.NotNull(result.PersonId);
+        Assert.Equal("Allan", result.PersonIdentifier);
+        Assert.NotNull(result.DocumentId);
         Assert.True(result.Distance < 0.1f, $"expected a tiny distance, got {result.Distance}");
     }
 
@@ -93,7 +93,7 @@ public class FaceIntelligenceManagerTests : IDisposable
         var result = await rec.Recognize(TestFaces.Image(0, 1, 0, 0, 0, 0, 0, 0), AnyBox);
 
         Assert.False(result.IsMatch);
-        Assert.Null(result.Name);
+        Assert.Null(result.PersonIdentifier);
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public class FaceIntelligenceManagerTests : IDisposable
         var result = await rec.Recognize(TestFaces.Image(0.15f, 0.99f, 0, 0, 0, 0, 0, 0), AnyBox);
 
         Assert.True(result.IsMatch);
-        Assert.Equal("Allan", result.Name);
+        Assert.Equal("Allan", result.PersonIdentifier);
         Assert.True(result.Distance < 0.05f, $"expected nearest-shot distance, got {result.Distance}");
     }
 
@@ -183,11 +183,11 @@ public class FaceIntelligenceManagerTests : IDisposable
         var r0 = await rec.Recognize(TestFaces.Image(0.98f, 0.2f, 0, 0, 0, 0, 0, 0), AnyBox);
         var r1 = await rec.Recognize(TestFaces.Image(0.2f, 0.98f, 0, 0, 0, 0, 0, 0), AnyBox);
 
-        Assert.Equal("Twin", r0.Name);
-        Assert.Equal("Twin", r1.Name);
-        Assert.Equal(a.Id, r0.PersonId);
-        Assert.Equal(b.Id, r1.PersonId);
-        Assert.NotEqual(r0.PersonId, r1.PersonId); // distinct documents, same label
+        Assert.Equal("Twin", r0.PersonIdentifier);
+        Assert.Equal("Twin", r1.PersonIdentifier);
+        Assert.Equal(a.Id, r0.DocumentId);
+        Assert.Equal(b.Id, r1.DocumentId);
+        Assert.NotEqual(r0.DocumentId, r1.DocumentId); // distinct documents, same label
     }
 
     [Fact]
@@ -202,8 +202,8 @@ public class FaceIntelligenceManagerTests : IDisposable
         var all = await rec.GetAll();
 
         Assert.Equal(3, all.Count);
-        Assert.Equal(2, all.Count(p => p.Name == "Allan"));
-        Assert.Contains(all, p => p.Name == "Bob");
+        Assert.Equal(2, all.Count(p => p.PersonIdentifier == "Allan"));
+        Assert.Contains(all, p => p.PersonIdentifier == "Bob");
     }
 
     [Fact]
@@ -239,6 +239,6 @@ public class FaceIntelligenceManagerTests : IDisposable
         var result = await rec.Recognize(TestFaces.Image(query), AnyBox);
 
         Assert.True(result.IsMatch);
-        Assert.Equal("Allan", result.Name);
+        Assert.Equal("Allan", result.PersonIdentifier);
     }
 }

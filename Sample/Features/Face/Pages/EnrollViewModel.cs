@@ -36,6 +36,6 @@ public partial class EnrollViewModel : ObservableObject
     {
         var skipped = result.SkippedSteps > 0 ? $", {result.SkippedSteps} step(s) skipped" : String.Empty;
         this.StatusText =
-            $"Enrolled {result.People.Count} shots for '{result.Name}' — closest pair {result.MinPairwiseDistance:F3}{skipped}.";
+            $"Enrolled {result.People.Count} shots for '{result.PersonIdentifier}' — closest pair {result.MinPairwiseDistance:F3}{skipped}.";
     }
 }

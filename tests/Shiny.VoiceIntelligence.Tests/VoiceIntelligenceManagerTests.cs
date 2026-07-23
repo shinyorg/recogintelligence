@@ -70,8 +70,8 @@ public class VoiceIntelligenceManagerTests : IDisposable
         var result = await rec.Recognize(TestVoices.Utterance(0.98f, 0.2f, 0, 0, 0, 0, 0, 0));
 
         Assert.True(result.IsMatch);
-        Assert.Equal("Allan", result.Name);
-        Assert.NotNull(result.SpeakerId);
+        Assert.Equal("Allan", result.PersonIdentifier);
+        Assert.NotNull(result.DocumentId);
         Assert.True(result.Distance < 0.1f, $"expected a tiny distance, got {result.Distance}");
     }
 
@@ -86,7 +86,7 @@ public class VoiceIntelligenceManagerTests : IDisposable
         var result = await rec.Recognize(TestVoices.Utterance(0, 1, 0, 0, 0, 0, 0, 0));
 
         Assert.False(result.IsMatch);
-        Assert.Null(result.Name);
+        Assert.Null(result.PersonIdentifier);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public class VoiceIntelligenceManagerTests : IDisposable
         var result = await rec.Recognize(TestVoices.Utterance(0.15f, 0.99f, 0, 0, 0, 0, 0, 0));
 
         Assert.True(result.IsMatch);
-        Assert.Equal("Allan", result.Name);
+        Assert.Equal("Allan", result.PersonIdentifier);
         Assert.True(result.Distance < 0.05f, $"expected nearest-utterance distance, got {result.Distance}");
     }
 
@@ -173,8 +173,8 @@ public class VoiceIntelligenceManagerTests : IDisposable
         var all = await rec.GetAll();
 
         Assert.Equal(3, all.Count);
-        Assert.Equal(2, all.Count(p => p.Name == "Allan"));
-        Assert.Contains(all, p => p.Name == "Bob");
+        Assert.Equal(2, all.Count(p => p.PersonIdentifier == "Allan"));
+        Assert.Contains(all, p => p.PersonIdentifier == "Bob");
     }
 
     [Fact]
@@ -194,6 +194,6 @@ public class VoiceIntelligenceManagerTests : IDisposable
         var result = await rec.Recognize(TestVoices.Utterance(query));
 
         Assert.True(result.IsMatch);
-        Assert.Equal("Allan", result.Name);
+        Assert.Equal("Allan", result.PersonIdentifier);
     }
 }

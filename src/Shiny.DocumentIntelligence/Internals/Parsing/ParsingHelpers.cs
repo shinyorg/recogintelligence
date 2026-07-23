@@ -25,12 +25,22 @@ static partial class ParsingHelpers
     private static partial Regex MonthDayYearRegex();
 
     /// <summary>The last money amount on a line (totals sit at the right/end), or null.</summary>
-    public static decimal? LastMoney(string line)
+    public static decimal? LastMoney(string line) => LastMoneyMatch(line)?.Value;
+
+    /// <summary>
+    /// The last money amount on a line, with <b>where</b> it started. The index matters: to strip the amount
+    /// off a row you must cut at the text that matched, not search for a reformat of the parsed value —
+    /// "1,234.56" never equals its decimal's "0.00" rendering, which used to leave the amount sitting in the
+    /// line item's description.
+    /// </summary>
+    static (decimal Value, int Index)? LastMoneyMatch(string line)
     {
         Match? last = null;
         foreach (Match m in MoneyRegex().Matches(line))
             last = m;
-        return last is null ? null : ParseMoney(last.Groups["num"].Value);
+        if (last is null)
+            return null;
+        return ParseMoney(last.Groups["num"].Value) is { } value ? (value, last.Index) : null;
     }
 
     /// <summary>The largest money amount anywhere in the text (a fallback for the receipt total).</summary>
@@ -91,21 +101,74 @@ static partial class ParsingHelpers
     public static IReadOnlyList<LineItem> ExtractLineItems(IReadOnlyList<string> lines, string[] skip)
     {
         var items = new List<LineItem>();
-        foreach (var line in lines)
+        for (var i = 0; i < lines.Count; i++)
         {
-            var lower = line.ToLowerInvariant();
-            if (skip.Any(s => lower.Contains(s)))
+            var line = lines[i];
+            if (ContainsAny(line, skip))
                 continue;
-            if (LastMoney(line) is not { } amount)
+            if (LastMoneyMatch(line) is not { } money)
                 continue;
 
             // Description is the text before the trailing amount.
-            var idx = line.LastIndexOf(amount.ToString("0.00"), StringComparison.Ordinal);
-            var desc = (idx > 0 ? line[..idx] : line).TrimEnd(' ', '$', '£', '€', '.', '-').Trim();
-            if (desc.Length > 0 && desc.Any(Char.IsLetter))
-                items.Add(new LineItem(desc, amount));
+            var desc = Tidy(line[..money.Index]);
+
+            // Retail receipts routinely put the SKU, quantity and price on one row and the product name on
+            // the next ("0979327 69.95 69.95" / "Millie Linen Pull-On"), so an amount row with no words of
+            // its own isn't junk — its description is simply the row below.
+            if (!LooksLikeWords(desc))
+                desc = BorrowDescription(lines, i, skip) ?? desc;
+
+            if (LooksLikeWords(desc))
+                items.Add(new LineItem(desc, money.Value));
         }
         return items;
+    }
+
+    /// <summary>
+    /// The description for an amount row that carries none itself: the nearest following row that reads like
+    /// words and has no amount of its own. Stops at the next amount row — that's the next item, not this
+    /// one's description — and looks no further than a couple of rows, since a product name follows its price
+    /// immediately.
+    /// </summary>
+    static string? BorrowDescription(IReadOnlyList<string> lines, int from, string[] skip)
+    {
+        for (var i = from + 1; i < lines.Count && i <= from + 2; i++)
+        {
+            var candidate = lines[i];
+            if (LastMoneyMatch(candidate) is not null)
+                return null;
+            if (ContainsAny(candidate, skip))
+                continue;
+            if (LooksLikeWords(candidate))
+                return Tidy(candidate);
+        }
+        return null;
+    }
+
+    /// <summary>Strips the currency symbols and column rules ('|', a vertical rule the OCR read as text).</summary>
+    static string Tidy(string text) => text.Trim().TrimEnd(' ', '$', '£', '€', '.', '-', '|').Trim();
+
+    /// <summary>
+    /// Whether text contains an actual word — three consecutive letters. A bare SKU ("0979327") and a size
+    /// code ("0/S/010") both contain letters or none but read as noise; requiring a run of them is what
+    /// separates a product name from the rest of the row.
+    /// </summary>
+    static bool LooksLikeWords(string text)
+    {
+        var run = 0;
+        foreach (var c in text)
+        {
+            run = Char.IsLetter(c) ? run + 1 : 0;
+            if (run >= 3)
+                return true;
+        }
+        return false;
+    }
+
+    static bool ContainsAny(string line, string[] keywords)
+    {
+        var lower = line.ToLowerInvariant();
+        return keywords.Any(k => lower.Contains(k));
     }
 
     static decimal? ParseMoney(string num) =>

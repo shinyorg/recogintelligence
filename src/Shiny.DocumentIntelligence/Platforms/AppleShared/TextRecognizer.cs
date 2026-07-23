@@ -7,8 +7,9 @@ namespace Shiny.DocumentIntelligence;
 
 /// <summary>
 /// Apple Vision OCR (<see cref="VNRecognizeTextRequest"/>), shared by iOS, Mac Catalyst, and macOS. Images
-/// are decoded via ImageIO's <see cref="CGImageSource"/> so there's no UIKit/AppKit split. Observations are
-/// returned in reading order (top-to-bottom) — important for the passport MRZ.
+/// are decoded via ImageIO's <see cref="CGImageSource"/> so there's no UIKit/AppKit split. Each observation
+/// keeps its bounding box, so <see cref="RecognizedText.FromLines"/> can put them in reading order and group
+/// the ones Vision split across a column gap back into one row.
 /// </summary>
 public class TextRecognizer : ITextRecognizer
 {
@@ -52,13 +53,11 @@ public class TextRecognizer : ITextRecognizer
             if (observations is null || observations.Length == 0)
                 return RecognizedText.Empty;
 
-            // Vision's origin is bottom-left, so descending Y is top-to-bottom reading order.
             var lines = observations
-                .OrderByDescending(o => o.BoundingBox.Y)
                 .Select(o =>
                 {
                     var candidate = o.TopCandidates(1)?.FirstOrDefault();
-                    return candidate is null ? null : new RecognizedLine(candidate.String, candidate.Confidence);
+                    return candidate is null ? null : new RecognizedLine(candidate.String, candidate.Confidence, ToBounds(o.BoundingBox));
                 })
                 .Where(l => l is not null && l.Text.Length > 0)
                 .Select(l => l!)
@@ -67,4 +66,12 @@ public class TextRecognizer : ITextRecognizer
             return RecognizedText.FromLines(lines);
         }, cancellationToken);
     }
+
+    /// <summary>Vision's normalized rect has a bottom-left origin; <see cref="TextBounds"/> is top-left.</summary>
+    static TextBounds ToBounds(CGRect box) => new(
+        (float)box.X,
+        (float)(1d - (box.Y + box.Height)),
+        (float)box.Width,
+        (float)box.Height
+    );
 }

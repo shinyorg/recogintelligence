@@ -29,12 +29,12 @@ public class FaceDetectionException(FaceDetectionError reason, string message) :
 
 /// <summary>
 /// Thrown by the no-box <c>Enroll</c> when the captured face already matches a <b>different</b> enrolled
-/// person within the distance threshold — i.e. you're likely enrolling the wrong face under a new name.
-/// Catch it to prompt "looks like {Match.Name} — enroll anyway?" and re-call <c>Enroll</c> with
+/// person within the distance threshold — i.e. you're likely enrolling the wrong face under a new identity.
+/// Catch it to prompt "looks like {Match.PersonIdentifier} — enroll anyway?" and re-call <c>Enroll</c> with
 /// <c>allowDuplicate: true</c> to force it.
 /// </summary>
 public class FaceEnrollmentConflictException(RecognitionResult match)
-    : Exception($"This face already matches '{match.Name}' (distance {match.Distance:0.00}).")
+    : Exception($"This face already matches '{match.PersonIdentifier}' (distance {match.Distance:0.00}).")
 {
     /// <summary>The existing person this face matched.</summary>
     public RecognitionResult Match { get; } = match;

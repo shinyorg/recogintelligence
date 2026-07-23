@@ -53,13 +53,13 @@ public class VoiceEnrollmentSession
     Candidate? heldOut;
     int attempts;
 
-    /// <param name="name">Name to enroll under.</param>
+    /// <param name="personIdentifier">Identity to enroll under.</param>
     /// <param name="embedder">Turns samples into voiceprints; also defines the required sample rate.</param>
     /// <param name="store">Where accepted recordings are written when the session completes.</param>
     /// <param name="options">Prompts, sample counts and gates. See <see cref="VoiceEnrollmentOptions"/>.</param>
-    public VoiceEnrollmentSession(string name, ISpeakerEmbedder embedder, IVoiceStore store, VoiceEnrollmentOptions options)
+    public VoiceEnrollmentSession(string personIdentifier, ISpeakerEmbedder embedder, IVoiceStore store, VoiceEnrollmentOptions options)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(personIdentifier);
         ArgumentNullException.ThrowIfNull(embedder);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(options);
@@ -68,14 +68,14 @@ public class VoiceEnrollmentSession
         if (options.MinSamples < 1 || options.MaxSamples < options.MinSamples)
             throw new ArgumentException("MaxSamples must be at least MinSamples, and MinSamples at least 1.", nameof(options));
 
-        this.Name = name.Trim();
+        this.PersonIdentifier = personIdentifier.Trim();
         this.embedder = embedder;
         this.store = store;
         this.Options = options;
     }
 
-    /// <summary>The name being enrolled.</summary>
-    public string Name { get; }
+    /// <summary>The identity being enrolled.</summary>
+    public string PersonIdentifier { get; }
 
     /// <inheritdoc cref="VoiceEnrollmentOptions"/>
     public VoiceEnrollmentOptions Options { get; }
@@ -228,7 +228,7 @@ public class VoiceEnrollmentSession
             var speaker = new Speaker
             {
                 Id = Guid.NewGuid().ToString("n"),
-                Name = this.Name,
+                PersonIdentifier = this.PersonIdentifier,
                 Embedding = candidate.Embedding,
                 EnrolledAt = DateTimeOffset.UtcNow
             };
@@ -236,7 +236,7 @@ public class VoiceEnrollmentSession
             speakers.Add(speaker);
         }
 
-        this.Result = new VoiceEnrollmentResult(this.Name, speakers, this.Cohesion, confident);
+        this.Result = new VoiceEnrollmentResult(this.PersonIdentifier, speakers, this.Cohesion, confident);
         return this.Result;
     }
 

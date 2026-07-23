@@ -112,7 +112,7 @@ public class FaceRecognitionView : ContentView
     public FaceRecognitionAnalyzer? Analyzer => this.analyzer;
 
     /// <summary>
-    /// Enroll the face the analyzer is currently looking at, under <paramref name="name"/>. Returns the
+    /// Enroll the face the analyzer is currently looking at, under <paramref name="personIdentifier"/>. Returns the
     /// stored <see cref="Person"/>, or <c>null</c> when no face is currently in view.
     /// </summary>
     /// <remarks>
@@ -120,12 +120,12 @@ public class FaceRecognitionView : ContentView
     /// (re-call with <paramref name="allowDuplicate"/> to force) and <see cref="FileNotFoundException"/> when
     /// the model is missing — handle both, they are the two a UI must explain.
     /// </remarks>
-    /// <param name="name">Display name to enroll under. Enroll several shots per person, varying angle and lighting.</param>
+    /// <param name="personIdentifier">Identity to enroll under. Enroll several shots per person, varying angle and lighting.</param>
     /// <param name="allowDuplicate">Skip the "this looks like someone else" gate.</param>
     /// <param name="ct">Cancellation.</param>
-    public async Task<Person?> EnrollAsync(string name, bool allowDuplicate = false, CancellationToken ct = default)
+    public async Task<Person?> EnrollAsync(string personIdentifier, bool allowDuplicate = false, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(personIdentifier);
 
         var intelligence = this.Resolve<IFaceIntelligence>();
         var face = this.analyzer?.LastFace;
@@ -133,7 +133,7 @@ public class FaceRecognitionView : ContentView
             return null;
 
         // The box-based overload: no re-detection, so the crop is byte-identical to what recognition sees.
-        return await intelligence.Enroll(name, face.ImageData, face.Box, ct).ConfigureAwait(false);
+        return await intelligence.Enroll(personIdentifier, face.ImageData, face.Box, ct).ConfigureAwait(false);
     }
 
     /// <summary>Subscribe to the containing page's Disappearing — the earliest reliable teardown signal.</summary>

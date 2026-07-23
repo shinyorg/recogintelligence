@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Shiny;
@@ -11,16 +10,44 @@ namespace Sample.Features.Documents.Pages;
 public partial class ScanViewModel(IDocumentScanner scanner, IDocumentExtractor extractor, IDialogs dialogs) : ObservableObject
 {
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPages))]
     public partial ObservableCollection<ImageSource> Pages { get; set; } = new();
+
+    public bool HasPages => this.Pages.Count > 0;
 
     [ObservableProperty]
     public partial string StatusText { get; set; } = "Pick a document type and tap Scan.";
 
+    /// <summary>The typed result, grouped for display. Replaced wholesale on each scan.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasExtractedText))]
-    public partial string? ExtractedText { get; set; }
+    [NotifyPropertyChangedFor(nameof(HasSections), nameof(HasNoSections))]
+    public partial IReadOnlyList<ParsedSection> Sections { get; set; } = [];
 
-    public bool HasExtractedText => !String.IsNullOrWhiteSpace(this.ExtractedText);
+    public bool HasSections => this.Sections.Count > 0;
+
+    /// <summary>Exists so the XAML can show the empty state without an inverse-bool converter.</summary>
+    public bool HasNoSections => this.Sections.Count == 0;
+
+    /// <summary>
+    /// The raw OCR/barcode text, behind a toggle. It's demoted rather than dropped: when a field comes back
+    /// empty, the raw text is how you tell a parsing miss from an OCR miss.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRawText), nameof(RawTextButtonText))]
+    public partial string? RawText { get; set; }
+
+    public bool HasRawText => !String.IsNullOrWhiteSpace(this.RawText);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RawTextButtonText))]
+    public partial bool ShowRawText { get; set; }
+
+    public string RawTextButtonText => this.ShowRawText
+        ? "Hide raw text"
+        : $"Show raw text ({this.RawText?.Length ?? 0} chars)";
+
+    [RelayCommand]
+    void ToggleRawText() => this.ShowRawText = !this.ShowRawText;
 
     /// <summary>The document types the user can extract. Bound to a Picker in the page.</summary>
     public IReadOnlyList<DocumentType> DocumentTypes { get; } =
@@ -38,7 +65,8 @@ public partial class ScanViewModel(IDocumentScanner scanner, IDocumentExtractor 
             return;
         }
 
-        this.ExtractedText = null;
+        this.Sections = [];
+        this.RawText = null;
         try
         {
             // The license barcode lives on the back, so allow a couple of pages for it.
@@ -62,10 +90,13 @@ public partial class ScanViewModel(IDocumentScanner scanner, IDocumentExtractor 
 
             // Second stage: turn the captured images into structured fields on-device.
             var extracted = await extractor.ExtractAsync(result, this.SelectedDocumentType);
-            this.ExtractedText = Format(extracted);
+            this.Sections = BuildSections(extracted);
+            this.RawText = extracted.RawText;
+            // Nothing parsed means the raw text is the only thing to look at, so open it unasked.
+            this.ShowRawText = !extracted.HasStructuredData;
             this.StatusText = extracted.HasStructuredData
                 ? $"Extracted {this.SelectedDocumentType} fields."
-                : $"Scanned, but couldn't read {this.SelectedDocumentType} fields. Showing raw text.";
+                : $"Scanned, but couldn't read {this.SelectedDocumentType} fields.";
         }
         catch (PlatformNotSupportedException)
         {
@@ -103,149 +134,163 @@ public partial class ScanViewModel(IDocumentScanner scanner, IDocumentExtractor 
         }
     }
 
-    static string Format(ExtractedDocument doc)
+    /// <summary>
+    /// Projects the extractor's output into display sections. Every payload property is listed by hand rather
+    /// than reflected over: the app is AOT-compatible, and an explicit list is the thing that makes a newly
+    /// added field an obvious compile-time-adjacent chore. <b>If you add a field to a payload record, add it
+    /// here too.</b>
+    /// </summary>
+    static IReadOnlyList<ParsedSection> BuildSections(ExtractedDocument doc)
     {
-        var sb = new StringBuilder();
+        var sections = new List<ParsedSection>
+        {
+            new("Extracted document", nameof(ExtractedDocument), [
+                new("Requested type", doc.Type.ToString()),
+                new("Structured data", doc.HasStructuredData ? "yes" : "no", IsWarning: !doc.HasStructuredData),
+                new("Raw text", $"{doc.RawText.Length} chars")
+            ])
+        };
+
         switch (doc)
         {
             case { Receipt: { } r }:
-                Add(sb, "Merchant", r.Merchant);
-                Add(sb, "Date", r.Date?.ToString("yyyy-MM-dd"));
-                Add(sb, "Subtotal", Money(r.Subtotal, r.Currency));
-                Add(sb, "Tax", Money(r.Tax, r.Currency));
-                Add(sb, "Total", Money(r.Total, r.Currency));
-                Add(sb, "Currency", r.Currency);
-                AddItems(sb, r.Items);
+                sections.Add(new ParsedSection("Receipt", nameof(ReceiptData), [
+                    new("Merchant", r.Merchant),
+                    new("Date", r.Date?.ToString("yyyy-MM-dd")),
+                    new("Subtotal", Money(r.Subtotal, r.Currency)),
+                    new("Tax", Money(r.Tax, r.Currency)),
+                    new("Total", Money(r.Total, r.Currency)),
+                    new("Currency", r.Currency)
+                ]));
+                sections.Add(ItemsSection(r.Items));
                 break;
 
             case { Invoice: { } i }:
-                Add(sb, "Vendor", i.Vendor);
-                Add(sb, "Invoice #", i.InvoiceNumber);
-                Add(sb, "Invoice Date", i.InvoiceDate?.ToString("yyyy-MM-dd"));
-                Add(sb, "Due Date", i.DueDate?.ToString("yyyy-MM-dd"));
-                Add(sb, "Subtotal", Money(i.Subtotal, i.Currency));
-                Add(sb, "Tax", Money(i.Tax, i.Currency));
-                Add(sb, "Total", Money(i.Total, i.Currency));
-                Add(sb, "Currency", i.Currency);
-                AddItems(sb, i.Items);
+                sections.Add(new ParsedSection("Invoice", nameof(InvoiceData), [
+                    new("Vendor", i.Vendor),
+                    new("Invoice #", i.InvoiceNumber),
+                    new("Invoice date", i.InvoiceDate?.ToString("yyyy-MM-dd")),
+                    new("Due date", i.DueDate?.ToString("yyyy-MM-dd")),
+                    new("Subtotal", Money(i.Subtotal, i.Currency)),
+                    new("Tax", Money(i.Tax, i.Currency)),
+                    new("Total", Money(i.Total, i.Currency)),
+                    new("Currency", i.Currency)
+                ]));
+                sections.Add(ItemsSection(i.Items));
                 break;
 
             case { License: { } l }:
-                Add(sb, "Name", String.Join(' ', new[] { l.FirstName, l.MiddleName, l.LastName }.Where(s => !String.IsNullOrEmpty(s))));
-                Add(sb, "License #", l.LicenseNumber);
-                Add(sb, "Date of Birth", l.DateOfBirth?.ToString("yyyy-MM-dd"));
-                Add(sb, "Issued", l.IssueDate?.ToString("yyyy-MM-dd"));
-                Add(sb, "Expires", l.ExpiryDate?.ToString("yyyy-MM-dd"));
-                Add(sb, "Sex", l.Sex);
-                Add(sb, "Address", String.Join(", ", new[] { l.Address, l.City, l.State, l.PostalCode }.Where(s => !String.IsNullOrEmpty(s))));
-                AddRemainingElements(sb, l);
+                sections.Add(new ParsedSection("Driver's licence", nameof(LicenseData), [
+                    new("Name", Join(' ', l.FirstName, l.MiddleName, l.LastName)),
+                    new("Licence #", l.LicenseNumber),
+                    new("Date of birth", l.DateOfBirth?.ToString("yyyy-MM-dd")),
+                    new("Issued", l.IssueDate?.ToString("yyyy-MM-dd")),
+                    new("Expires", l.ExpiryDate?.ToString("yyyy-MM-dd")),
+                    new("Sex", l.Sex),
+                    new("Address", Join(", ", l.Address, l.City, l.State, l.PostalCode))
+                ]));
+                if (RemainingElementsSection(l) is { } extras)
+                    sections.Add(extras);
                 break;
 
             case { Passport: { } p }:
-                Add(sb, "Document Code", p.DocumentCode);
-                Add(sb, "Issuing Country", p.IssuingCountry);
-                Add(sb, "Surname", p.Surname);
-                Add(sb, "Given Names", p.GivenNames);
-                Add(sb, "Passport #", p.PassportNumber);
-                Add(sb, "Nationality", p.Nationality);
-                Add(sb, "Date of Birth", p.DateOfBirth?.ToString("yyyy-MM-dd"));
-                Add(sb, "Sex", p.Sex);
-                Add(sb, "Expires", p.ExpiryDate?.ToString("yyyy-MM-dd"));
-                Add(sb, "Personal #", p.PersonalNumber);
-                Add(sb, "MRZ valid", p.IsValid ? "yes" : "no (check digits failed)");
+                sections.Add(new ParsedSection("Passport", nameof(PassportData), [
+                    new("Document code", p.DocumentCode),
+                    new("Issuing country", p.IssuingCountry),
+                    new("Surname", p.Surname),
+                    new("Given names", p.GivenNames),
+                    new("Passport #", p.PassportNumber),
+                    new("Nationality", p.Nationality),
+                    new("Date of birth", p.DateOfBirth?.ToString("yyyy-MM-dd")),
+                    new("Sex", p.Sex),
+                    new("Expires", p.ExpiryDate?.ToString("yyyy-MM-dd")),
+                    new("Personal #", p.PersonalNumber),
+                    new("MRZ check digits", p.IsValid ? "valid" : "failed — likely a misread", IsWarning: !p.IsValid)
+                ]));
                 break;
 
             case { CreditCard: { } c }:
                 // MASKED on purpose. This is a demo screen; showing a full PAN on-screen (and therefore in
                 // any screenshot or screen recording of it) is exactly the habit a payments app must not
                 // have. c.Number holds the full value if a real integration needs it.
-                Add(sb, "Card", c.MaskedNumber);
-                Add(sb, "Network", c.Network.ToString());
-                Add(sb, "Expires", c.ExpiryMonth is { } m && c.ExpiryYear is { } y ? $"{m:00}/{y}" : null);
-                Add(sb, "Cardholder", c.CardholderName);
-                Add(sb, "Luhn valid", c.IsValid ? "yes" : "no (check digit failed — likely a misread)");
-                if (c.ExpiresOn is { } exp)
-                    Add(sb, "Status", c.IsExpired(DateOnly.FromDateTime(DateTime.Today)) ? $"EXPIRED ({exp:yyyy-MM-dd})" : $"valid to {exp:yyyy-MM-dd}");
+                sections.Add(new ParsedSection("Credit card", nameof(CreditCardData), [
+                    new("Card", c.MaskedNumber),
+                    new("Network", c.Network.ToString()),
+                    new("Expires", c.ExpiryMonth is { } m && c.ExpiryYear is { } y ? $"{m:00}/{y}" : null),
+                    new("Cardholder", c.CardholderName),
+                    new("Luhn check digit", c.IsValid ? "valid" : "failed — likely a misread", IsWarning: !c.IsValid),
+                    ExpiryStatus(c)
+                ]));
                 break;
         }
 
-        AddEntities(sb, doc.Entities);
-
-        // The raw OCR/barcode text always follows the structured fields. When a parser returns nothing it's
-        // the only output; when it returns something it's how you tell a parsing miss from an OCR miss.
-        sb.AppendLine();
-        sb.AppendLine(sb.Length == 0 ? "Raw text:" : $"Raw text ({doc.RawText.Length} chars):");
-        sb.Append(String.IsNullOrWhiteSpace(doc.RawText) ? "—" : doc.RawText);
-
-        return sb.ToString().TrimEnd();
+        sections.Add(EntitiesSection(doc.Entities));
+        return sections;
     }
+
+    static ParsedField ExpiryStatus(CreditCardData card)
+    {
+        if (card.ExpiresOn is not { } expiry)
+            return new ParsedField("Status", null);
+
+        var expired = card.IsExpired(DateOnly.FromDateTime(DateTime.Today));
+        return new ParsedField("Status", expired ? $"EXPIRED ({expiry:yyyy-MM-dd})" : $"valid to {expiry:yyyy-MM-dd}", IsWarning: expired);
+    }
+
+    static ParsedSection ItemsSection(IReadOnlyList<LineItem> items) =>
+        new(
+            $"Line items ({items.Count})",
+            $"{nameof(LineItem)}[]",
+            items.Count == 0
+                ? [new ParsedField("Items", null)]
+                : items.Select(i => new ParsedField(i.Description, i.Amount?.ToString("0.00"))).ToList()
+        );
 
     /// <summary>
     /// The AAMVA elements that aren't already surfaced as named fields. The barcode carries far more than
     /// the handful mapped onto <see cref="LicenseData"/>'s properties (height, eye colour, endorsements,
     /// restrictions…), and a demo of an extraction library should show what was actually extracted.
     /// </summary>
-    static void AddRemainingElements(StringBuilder sb, LicenseData license)
+    static ParsedSection? RemainingElementsSection(LicenseData license)
     {
         // Element IDs already shown above as named properties.
         string[] mapped = ["DAC", "DAD", "DCS", "DBB", "DAQ", "DBD", "DBA", "DBC", "DAG", "DAI", "DAJ", "DAK"];
         var rest = license.Elements
             .Where(kv => !mapped.Contains(kv.Key) && !String.IsNullOrWhiteSpace(kv.Value))
             .OrderBy(kv => kv.Key)
+            .Select(kv => new ParsedField(kv.Key, kv.Value))
             .ToList();
 
-        if (rest.Count == 0)
-            return;
-
-        sb.AppendLine();
-        sb.AppendLine($"Other AAMVA elements ({rest.Count}):");
-        foreach (var kv in rest)
-            sb.AppendLine($"  {kv.Key}: {kv.Value}");
+        return rest.Count == 0 ? null : new ParsedSection($"Other AAMVA elements ({rest.Count})", "Elements", rest);
     }
 
     /// <summary>
-    /// Print a field <b>always</b>, with an em dash when the parser didn't get it. This is a demo of an
-    /// extraction library, so what it <i>failed</i> to read is as informative as what it read — silently
-    /// omitting empty fields makes a partial parse look like a complete one.
+    /// Dates/addresses/phones/links the platform data detector found. Apple-only today, so elsewhere this
+    /// section reports nothing found — which is itself worth seeing when comparing platforms.
     /// </summary>
-    static void Add(StringBuilder sb, string label, string? value)
-        => sb.AppendLine($"{label}: {(String.IsNullOrWhiteSpace(value) ? "—" : value)}");
-
-    /// <summary>
-    /// Dates/addresses/phones/links the platform data detector found. Apple-only today, so this section is
-    /// simply absent elsewhere — which is itself worth seeing when comparing platforms.
-    /// </summary>
-    static void AddEntities(StringBuilder sb, IReadOnlyList<DetectedEntity> entities)
+    static ParsedSection EntitiesSection(IReadOnlyList<DetectedEntity> entities)
     {
-        sb.AppendLine();
         if (entities.Count == 0)
-        {
-            sb.AppendLine("Detected entities: — (no platform data detector, or nothing found)");
-            return;
-        }
+            return new ParsedSection("Detected entities (0)", $"{nameof(DetectedEntity)}[]", [
+                new ParsedField("Entities", "none — no platform data detector, or nothing matched")
+            ]);
 
-        sb.AppendLine($"Detected entities ({entities.Count}):");
+        var fields = new List<ParsedField>();
         foreach (var e in entities)
         {
             var detail = e.Kind == DetectedEntityKind.Date && e.Date is { } d ? $" → {d:yyyy-MM-dd}" : String.Empty;
-            sb.AppendLine($"  {e.Kind}: {e.Value}{detail}");
+            fields.Add(new ParsedField(e.Kind.ToString(), $"{e.Value}{detail}"));
             if (e.Components is { Count: > 0 } parts)
-                foreach (var kv in parts)
-                    sb.AppendLine($"      {kv.Key}: {kv.Value}");
+                fields.AddRange(parts.Select(kv => new ParsedField(kv.Key, kv.Value, IsDetail: true)));
         }
+        return new ParsedSection($"Detected entities ({entities.Count})", $"{nameof(DetectedEntity)}[]", fields);
     }
 
-    static void AddItems(StringBuilder sb, IReadOnlyList<LineItem> items)
-    {
-        if (items.Count == 0)
-        {
-            sb.AppendLine("Items: —");
-            return;
-        }
-        sb.AppendLine($"Items ({items.Count}):");
-        foreach (var item in items)
-            sb.AppendLine($"  • {item.Description}{(item.Amount is { } a ? $" — {a:0.00}" : "")}");
-    }
+    static string? Join(char separator, params string?[] parts) =>
+        String.Join(separator, parts.Where(s => !String.IsNullOrEmpty(s)));
+
+    static string? Join(string separator, params string?[] parts) =>
+        String.Join(separator, parts.Where(s => !String.IsNullOrEmpty(s)));
 
     static string? Money(decimal? amount, string? currency) =>
         amount is null ? null : $"{amount:0.00}{(currency is null ? "" : $" {currency}")}";

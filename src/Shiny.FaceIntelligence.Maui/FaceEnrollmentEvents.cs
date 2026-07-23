@@ -46,7 +46,7 @@ public record FaceEnrollmentRejected(FaceEnrollmentRejection Reason, string Hint
 /// <summary>
 /// The sequence finished. All accepted shots have been enrolled under the person's name by this point.
 /// </summary>
-/// <param name="Name">The name they were enrolled under.</param>
+/// <param name="PersonIdentifier">The identity they were enrolled under.</param>
 /// <param name="People">The stored <see cref="Person"/> documents — one per accepted shot.</param>
 /// <param name="MinPairwiseDistance">
 /// The smallest cosine distance between any two accepted shots — how tightly clustered the gallery is.
@@ -57,7 +57,7 @@ public record FaceEnrollmentRejected(FaceEnrollmentRejection Reason, string Hint
 /// unreachable at arm's length — and the shots that were captured are still stored.
 /// </param>
 public record FaceEnrollmentResult(
-    string Name,
+    string PersonIdentifier,
     IReadOnlyList<Person> People,
     float MinPairwiseDistance,
     int SkippedSteps = 0);

@@ -13,7 +13,7 @@
                      shiny:Navigate.RelativeNavigation="False" />
     </ContentPage.ToolbarItems>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="16" RowSpacing="12">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="16" RowSpacing="12">
         <Picker Grid.Row="0"
                 Title="Document type"
                 ItemsSource="{Binding DocumentTypes}"
@@ -23,25 +23,90 @@
                 Text="Scan &amp; Extract"
                 Command="{Binding ScanCommand}" />
 
-        <CollectionView Grid.Row="2" ItemsSource="{Binding Pages}">
-            <CollectionView.EmptyView>
-                <Label Text="No pages yet. Pick a type and scan a document."
-                       HorizontalOptions="Center" VerticalOptions="Center" />
-            </CollectionView.EmptyView>
+        <!-- The captured pages are a thumbnail strip: on this screen the parsed result is the subject, and
+             the images are the evidence you glance at when a field looks wrong. -->
+        <CollectionView Grid.Row="2"
+                        ItemsSource="{Binding Pages}"
+                        IsVisible="{Binding HasPages}"
+                        HeightRequest="150">
+            <CollectionView.ItemsLayout>
+                <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
+            </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="ImageSource">
-                    <Border Margin="0,6" Stroke="#22000000" StrokeShape="RoundRectangle 8">
-                        <Image Source="{Binding .}" Aspect="AspectFit" HeightRequest="200" />
+                    <Border Stroke="#22000000" StrokeShape="RoundRectangle 8">
+                        <Image Source="{Binding .}" Aspect="AspectFit" WidthRequest="110" HeightRequest="146" />
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <Border Grid.Row="3"
-                IsVisible="{Binding HasExtractedText}"
-                Stroke="#22000000" StrokeShape="RoundRectangle 8" Padding="12">
-            <Label Text="{Binding ExtractedText}" FontFamily="Monospace" />
-        </Border>
+        <ScrollView Grid.Row="3">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="No pages yet. Pick a type and scan a document."
+                       IsVisible="{Binding HasNoSections}"
+                       HorizontalOptions="Center" Margin="0,24" />
+
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Sections}" Spacing="12">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ParsedSection">
+                            <Border Stroke="#22000000" StrokeShape="RoundRectangle 8" Padding="12">
+                                <VerticalStackLayout Spacing="6">
+                                    <!-- Title plus the .NET type the extractor actually produced. -->
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Label Text="{Binding Title}" FontAttributes="Bold" FontSize="15" />
+                                        <Label Text="{Binding TypeName}"
+                                               IsVisible="{Binding HasTypeName}"
+                                               FontFamily="Monospace" FontSize="12" TextColor="Gray"
+                                               VerticalOptions="Center" />
+                                    </HorizontalStackLayout>
+
+                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Fields}" Spacing="3">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ParsedField">
+                                                <Grid ColumnDefinitions="140,*" ColumnSpacing="8"
+                                                      Margin="{Binding IndentMargin}">
+                                                    <Label Grid.Column="0"
+                                                           Text="{Binding Label}"
+                                                           FontSize="13" TextColor="Gray"
+                                                           LineBreakMode="WordWrap" />
+                                                    <Label Grid.Column="1"
+                                                           Text="{Binding Display}"
+                                                           FontSize="13" FontFamily="Monospace">
+                                                        <Label.Triggers>
+                                                            <!-- Missing reads as absent; a failed checksum or an
+                                                                 expired card reads as wrong. Different things. -->
+                                                            <DataTrigger TargetType="Label"
+                                                                         Binding="{Binding IsMissing}" Value="True">
+                                                                <Setter Property="TextColor" Value="#9E9E9E" />
+                                                            </DataTrigger>
+                                                            <DataTrigger TargetType="Label"
+                                                                         Binding="{Binding IsWarning}" Value="True">
+                                                                <Setter Property="TextColor" Value="#C62828" />
+                                                            </DataTrigger>
+                                                        </Label.Triggers>
+                                                    </Label>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </VerticalStackLayout>
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <!-- Raw OCR text: demoted, not dropped. It's how you tell a parsing miss from an OCR miss. -->
+                <Button Text="{Binding RawTextButtonText}"
+                        Command="{Binding ToggleRawTextCommand}"
+                        IsVisible="{Binding HasRawText}" />
+
+                <Border IsVisible="{Binding ShowRawText}"
+                        Stroke="#22000000" StrokeShape="RoundRectangle 8" Padding="12">
+                    <Label Text="{Binding RawText}" FontFamily="Monospace" FontSize="12" />
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
 
         <Label Grid.Row="4" Text="{Binding StatusText}" HorizontalTextAlignment="Center" />
     </Grid>

@@ -4,7 +4,7 @@ namespace Shiny.FaceIntelligence;
 
 /// <summary>
 /// An enrolled face. One <see cref="Person"/> document = one captured shot of someone, holding the
-/// L2-normalized face embedding used for vector search. Enroll several shots per name for a robust
+/// L2-normalized face embedding used for vector search. Enroll several shots per person for a robust
 /// match (varied angles/lighting); recognition takes the nearest neighbor across all of them.
 /// </summary>
 public class Person
@@ -12,8 +12,13 @@ public class Person
     /// <summary>Document id (auto-generated GUID when left empty).</summary>
     public string Id { get; set; } = "";
 
-    /// <summary>The name given to this face at enrollment. Multiple documents share the same name.</summary>
-    public string Name { get; set; } = "";
+    /// <summary>
+    /// The identity this shot belongs to. Every document with the same value is the same person, and this is
+    /// what <c>Recognize</c> returns and <c>Forget</c> deletes by. It is an opaque key chosen by the caller —
+    /// a user id, an employee number, a GUID. The library never interprets it and stores no display name of
+    /// its own; if you pass a person's name here, that name <i>is</i> the identity.
+    /// </summary>
+    public string PersonIdentifier { get; set; } = "";
 
     /// <summary>
     /// The face embedding produced by <see cref="IFaceEmbedder"/> — L2-normalized so cosine distance

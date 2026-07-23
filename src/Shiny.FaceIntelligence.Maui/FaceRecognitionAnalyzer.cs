@@ -239,7 +239,7 @@ public class FaceRecognitionAnalyzer : FrameAnalyzer
         var matched = this.lastResult?.IsMatch == true;
         var color = matched ? this.MatchColor : this.UnknownColor;
         var text = matched
-            ? $"{this.lastResult!.Name} · {this.lastResult.Similarity:P0}"
+            ? $"{this.lastResult!.PersonIdentifier} · {this.lastResult.Similarity:P0}"
             : this.UnknownText;
 
         return new OverlayBox(bounds, color, text, color);

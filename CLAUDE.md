@@ -142,7 +142,7 @@ Recognition runs against **live camera frames**. There is no still capture anywh
 
 ```xml
 <fi:FaceRecognitionView FaceRecognized="OnFaceRecognized" CameraFailed="OnCameraFailed" />
-<fi:FaceEnrollmentView PersonName="{Binding Name}" Completed="OnEnrolled" />
+<fi:FaceEnrollmentView PersonIdentifier="{Binding Name}" Completed="OnEnrolled" />
 ```
 
 `FaceRecognitionView.EnrollAsync(name)` still exists for a one-off single-shot capture off the current frame; the guided sequence is `FaceEnrollmentView.BeginEnrollment()`.
@@ -167,7 +167,7 @@ Only `net10.0-android;net10.0-ios;net10.0-maccatalyst` — there are no camera f
 
 ```xml
 <fi:FaceRecognitionView FaceRecognized="OnRecognized" />
-<fi:FaceEnrollmentView PersonName="{Binding Name}" Completed="OnEnrolled" />
+<fi:FaceEnrollmentView PersonIdentifier="{Binding Name}" Completed="OnEnrolled" />
 ```
 
 Both resolve their services from `Handler.MauiContext.Services`, so neither needs anything injected.
@@ -264,7 +264,7 @@ Keep the **face** packages at **`net10.0` only**. They already serve every consu
 
 The audio twin of the face stack, deliberately built to the **same architecture** so the two read alike. Speaker (voice biometric) enrollment + recognition: an ECAPA-TDNN / x-vector ONNX model turns a mono utterance into an L2-normalized "voiceprint", stored and matched by the **same sqlite-vec nearest-neighbor + cosine-distance** machinery as faces. It originated as a scaffold in the `~/Desktop/dev/speech` repo (`Shiny.Speech.Biometrics`, brute-force cosine over Shiny.DocumentDb) and was **moved here and re-based on this repo's real ANN vector store** — a strict upgrade — then that scaffold was deleted from the speech repo.
 
-**Parallel to face, one-to-one.** Same builder + validation (`AddVoiceIntelligence` throws unless an `ISpeakerEmbedder` and an `IVoiceStore` are registered, naming `UseOnnxEmbedder`/`UseSqliteStore`), same lazy-model and lazy-store deferral, same "vector dimension read from the embedder" (`MapVectorProperty<Speaker>(s => s.Embedding, embedder.Dimensions, VectorDistance.Cosine)`), same `[JsonIgnore]` embedding living only in the vec0 sidecar, same "one document = one utterance, keyed by free-text `Name`" model (inherits the **same identity-vs-name TODO** as face). `VoicesJsonContext` is the source-gen `JsonSerializerContext` for `Speaker`. Registration reads identically:
+**Parallel to face, one-to-one.** Same builder + validation (`AddVoiceIntelligence` throws unless an `ISpeakerEmbedder` and an `IVoiceStore` are registered, naming `UseOnnxEmbedder`/`UseSqliteStore`), same lazy-model and lazy-store deferral, same "vector dimension read from the embedder" (`MapVectorProperty<Speaker>(s => s.Embedding, embedder.Dimensions, VectorDistance.Cosine)`), same `[JsonIgnore]` embedding living only in the vec0 sidecar, same "one document = one utterance, keyed by `PersonIdentifier`" model. `VoicesJsonContext` is the source-gen `JsonSerializerContext` for `Speaker`. Registration reads identically:
 
 ```csharp
 services.AddVoiceIntelligence(voice =>
@@ -407,6 +407,20 @@ A single **modal** scanner contract — `IDocumentScanner.ScanAsync(...)` → `D
 
 **Extraction types**: `Receipt`, `Invoice` (OCR + heuristics), `DriversLicense` (AAMVA PDF417), `Passport` (ICAO 9303 MRZ), `CreditCard` (OCR + Luhn).
 
+### OCR geometry is preserved, and rows are regrouped before parsing (settled — this was the main accuracy bug)
+
+**Both OCR engines split text at large whitespace gaps, so a receipt's `TOTAL .......... 24.99` comes back as *two* observations** — the label and the amount are never in the same string. Every parser here is keyword-anchored ("the amount on the line that says total"), so before this they matched nothing and silently fell through to their fallbacks: `ReceiptParser` took `MaxMoney(text)`, the largest number anywhere on the page, which on a discounted receipt is the pre-discount subtotal. Total, tax, subtotal *and* line items were all effectively being guessed.
+
+The fix is in the plumbing, not the parsers. `RecognizedLine` carries `TextBounds` (normalized 0..1, **top-left origin** — Vision's bottom-left rects and ML Kit's pixel rects both convert on the way in, so layout code has one coordinate space), and `RecognizedText.FromLines` — the factory every recognizer already used — runs `Internals/TextLayout.cs`: order into reading order, group fragments into visual rows, then compose `FullText` from the **rows**. So all four parsers improved with no parser change.
+
+- `RecognizedText.Lines` is still the raw engine fragments; `Rows` is the grouped view; `FullText` is the rows joined. Parsers read `FullText`.
+- Grouping rule: same row when vertical centres are within **0.6 × the *median* fragment height**. Median, not mean — a receipt's merchant name is several times the height of its line items and a mean would stretch the tolerance until adjacent rows merged. 0.6 sits comfortably below the ~1.2× spacing of consecutive rows, so a passport's two MRZ lines stay separate (`MrzLines_AreNotMergedIntoOne`) while a column of amounts still lands on its labels.
+- **Missing geometry is a passthrough, not an error.** If *any* fragment lacks bounds the set is returned untouched, so the bare-net10.0 stub and any custom `ITextRecognizer` keep their exact old behaviour.
+- Bonus fix: ML Kit's block order isn't reading order, and Vision was only sorted by Y with no X tiebreak — ordering now happens once, geometrically, for both.
+- Covered by `TextLayoutTests` (10 tests through the public `FromLines` seam, including the end-to-end "parser finds the real total, not the biggest number").
+
+Still open, in value order: **multi-candidate + checksum selection** (Vision's `TopCandidates(1)` discards alternatives you could validate with Luhn / MRZ check digits — the biggest remaining win for cards and passports); MRZ character-class repair (`MrzParser.Normalize` says it maps OCR confusions toward `<` but only uppercases and strips whitespace, and `FindFixedWidthRun` then *requires* a `<`); `TextRecognitionOptions.Document` leaving `MinimumTextHeight` at Vision's 1/32-of-image-height default, which drops small print; receipt arithmetic cross-validation (`subtotal + tax ≈ total`); `ExtractLineItems`' `LastIndexOf(amount.ToString("0.00"))` failing on grouped amounts like `1,234.56`; and `DocumentExtractor` concatenating all pages into one string, which makes "bottom-most total" cross page boundaries.
+
 **Credit card scanning (`CreditCardParser` → `CreditCardData`).** The Luhn check digit is what makes this work: rather than guessing which digit run on a noisy card front is the PAN, every 13–19 digit candidate is tested and only a Luhn-valid one is accepted, which rejects dates, phone numbers and OCR noise without layout heuristics. Network comes from the IIN prefix; expiry prefers a `VALID THRU`-labelled line and otherwise takes the *latest* MM/YY found (cards also print `MEMBER SINCE` in the same shape); the cardholder is the bottom-most all-caps multi-word line that isn't card furniture. A result is returned even when Luhn fails, with `IsValid=false`, so a UI can show what was read instead of "nothing found".
 
 **Two security choices in that type are deliberate — don't undo them:**
@@ -430,7 +444,11 @@ Note `Platforms/AppleVision/` was renamed to `Platforms/AppleShared/`: the folde
 
 **No MAUI dependency** (deliberate — `UseMauiEssentials` is resolved before the project body, so it can't be set per-TFM without polluting the shared `Directory.Build.props`; and macOS AppKit isn't a MAUI platform). Platform context is obtained natively: iOS walks `ConnectedScenes` for the top VC; **Android tracks the current `Activity` via `AndroidPlatform`**, bootstrapped by a zero-config `StartupContentProvider` (`[ContentProvider]` with a `${applicationId}`-scoped authority) that registers `IActivityLifecycleCallbacks` before the first activity — the same auto-init trick Essentials uses.
 
-The Sample's **Scan** tab (`ScanViewModel`/`ScanPage`) drives it end-to-end, and its `Format(...)` renders **every** field of each payload — including the license `IssueDate` and the full remaining AAMVA `Elements` dictionary, and the passport `DocumentCode`/`IssuingCountry`/`PersonalNumber`, all of which it previously dropped. If you add a field to a payload record, add it there too. The MAUI heads are android/ios, so the Sample exercises the VisionKit + ML Kit paths; the macOS AppKit path is library-only (MAUI targets Mac **Catalyst**, which uses the VisionKit path). iOS needs `NSCameraUsageDescription` in `Info.plist` (added).
+The Sample's **Scan** tab (`ScanViewModel`/`ScanPage`) drives it end-to-end. `BuildSections(...)` projects the result into `ParsedSection`/`ParsedField` rows (`Features/Documents/Pages/ParsedSection.cs`), so the screen shows **the typed result as fields** — each section headed by the actual .NET type (`ReceiptData`, `PassportData`, …) — rather than a formatted text blob. It renders **every** field of each payload, including the license `IssueDate` and the full remaining AAMVA `Elements` dictionary, and the passport `DocumentCode`/`IssuingCountry`/`PersonalNumber`. **If you add a field to a payload record, add it there too** — the projection is hand-written, not reflected, because the app is AOT-compatible.
+
+Three display rules there are deliberate: a field renders **even when null** (as `—`), because what the parser *failed* to read is as informative as what it read and omitting empties makes a partial parse look complete; **missing and wrong are coloured differently** (grey `—` vs red for a failed Luhn/MRZ check digit or an expired card), because they mean different things; and the **raw OCR text is behind a toggle**, auto-opened only when nothing parsed — it's how you tell a parsing miss from an OCR miss, but it shouldn't be the headline. The captured pages are a horizontal thumbnail strip for the same reason: on this screen the parsed result is the subject and the images are the evidence.
+
+The MAUI heads are android/ios, so the Sample exercises the VisionKit + ML Kit paths; the macOS AppKit path is library-only (MAUI targets Mac **Catalyst**, which uses the VisionKit path). iOS needs `NSCameraUsageDescription` in `Info.plist` (added).
 
 ## Tuning
 
@@ -439,9 +457,10 @@ The Sample's **Scan** tab (`ScanViewModel`/`ScanPage`) drives it end-to-end, and
 
 ## TODOs / known follow-ups
 
-- **Identity is keyed solely by the free-text `Person.Name`** — the main fragility. Two different people enrolled under the same name are silently conflated (a match to either returns that one name); one person under two names fragments into competing identities whose returned label varies run-to-run by pose/lighting. Enrolling never corrupts another person's data (independent GUID inserts), but:
-  - **(highest value)** Decouple identity from display name: add a stable `PersonKey`/id to `Person` and group documents by it instead of by `Name`.
-  - Gate enrollment with a recognition pass: before inserting, run `Recognize`; if it already matches someone within `MaxDistance`, prompt "looks like X — add as another photo of X, or enroll as new?".
+- **Identity is now an explicit `PersonIdentifier`, and the library stores no display name.** `Person.PersonIdentifier`/`Speaker.PersonIdentifier` is the identity key — an opaque caller-chosen string (user id, employee number, GUID). It's what `Enroll` takes, `Recognize` returns, and `Forget` deletes by; `IFaceStore`/`IVoiceStore` expose `RemoveByPersonIdentifier`. **The Sample passes the typed-in name as the identifier**, which is a legitimate choice for a demo and keeps its "one name per person" UX. Two related names that are easy to confuse: `Person.Id` is the *document* id (one stored shot, a fresh GUID per enroll), and `RecognitionResult.DocumentId` is that document id for the nearest hit — neither is an identity. What remains:
+  - The **conflation risk didn't vanish, it moved to the caller.** Two different people enrolled under the same identifier are still silently merged, and one person under two identifiers still fragments. The library now makes that the app's explicit decision rather than an accident of a free-text name — an app that mints a stable key per person (as the Sample deliberately does not) is immune.
+  - Gate enrollment with a recognition pass: before inserting, run `Recognize`; if it already matches someone within `MaxDistance`, prompt "looks like X — add as another shot of X, or enroll as new?". (The no-box `Enroll` overload already does this via `GateEnrollmentOnRecognition`; the box-based one used by the camera controls does not.)
   - Vote-based matching: require a majority of the top-k (`CandidateCount`) neighbors to agree before accepting a match, instead of trusting `hits[0]`.
+  - **No migration was written.** The identifier is persisted in the JSON document blob under its property name, so records enrolled before the rename deserialize with an empty `PersonIdentifier` and will never match. Delete `faces.db`/`voices.db` (or re-enroll) rather than expecting old data to carry over.
 - **Coordinate space**: `DetectedFace.Bounds` (normalized `0..1`, upright image space) and the captured `CameraPhoto` are paired by `DetectionCaptured`. The Sample now scales bounds by `photo.Width`/`photo.Height` (the normalized→pixel fix). Still verify on-device that the resulting box lands on the face given **front-camera mirroring/rotation** — if the still is mirrored/rotated vs. upright image space, the box may need flipping/rotating before cropping.
 - **Alignment**: `FaceImaging.CropResize` does an expand-and-resize crop. For best ArcFace accuracy, add 5-point landmark alignment (the detector returns optional `Landmarks`).

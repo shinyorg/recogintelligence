@@ -31,7 +31,7 @@ public partial class SpeakersViewModel(IVoiceIntelligence voice, IDialogs dialog
         {
             var speakers = await voice.GetAll();
             var rows = speakers
-                .GroupBy(s => s.Name)
+                .GroupBy(s => s.PersonIdentifier)   // the Sample uses the person's name as the identifier
                 .Select(g => new SpeakerRow(g.Key, g.Count()))
                 .OrderBy(r => r.Name)
                 .ToList();

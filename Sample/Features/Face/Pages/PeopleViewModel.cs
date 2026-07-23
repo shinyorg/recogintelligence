@@ -25,7 +25,7 @@ public partial class PeopleViewModel(IFaceIntelligence recognizer, IDialogs dial
         {
             var people = await recognizer.GetAll();
             var rows = people
-                .GroupBy(p => p.Name)
+                .GroupBy(p => p.PersonIdentifier)   // the Sample uses the person's name as the identifier
                 .Select(g =>
                 {
                     var withThumb = g.FirstOrDefault(p => p.Thumbnail is { Length: > 0 });

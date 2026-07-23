@@ -17,18 +17,18 @@ public class FaceIntelligenceManager(
     // Optional: box-based Enroll/Recognize work without a detector; the no-box overloads require one.
     readonly IFaceDetector? detector = detectors.FirstOrDefault();
 
-    public async Task<Person> Enroll(string name, byte[] imageData, FaceBox face, CancellationToken ct = default)
+    public async Task<Person> Enroll(string personIdentifier, byte[] imageData, FaceBox face, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(personIdentifier);
 
         // Embedding (ONNX inference) and thumbnail encoding (image decode) are synchronous and CPU-bound,
         // and the first embed also loads the model — run them off the caller's thread so awaiting from a UI
         // thread never blocks the UI. See also Recognize.
-        var name2 = name.Trim();
+        var id = personIdentifier.Trim();
         var person = await Task.Run(() => new Person
         {
             Id = Guid.NewGuid().ToString("n"), // string ids must be explicit
-            Name = name2,
+            PersonIdentifier = id,
             Embedding = embedder.Embed(imageData, face),
             Thumbnail = FaceImaging.EncodeThumbnail(imageData, face),
             EnrolledAt = DateTimeOffset.UtcNow
@@ -37,10 +37,10 @@ public class FaceIntelligenceManager(
         return person;
     }
 
-    public async Task<Person> Enroll(string name, byte[] imageData, bool allowDuplicate = false, CancellationToken ct = default)
+    public async Task<Person> Enroll(string personIdentifier, byte[] imageData, bool allowDuplicate = false, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var name2 = name.Trim();
+        ArgumentException.ThrowIfNullOrWhiteSpace(personIdentifier);
+        var id = personIdentifier.Trim();
 
         // Detect (gated) + embed + thumbnail are all synchronous/CPU-bound — offload the whole block.
         var (embedding, thumbnail) = await Task.Run(() =>
@@ -50,23 +50,23 @@ public class FaceIntelligenceManager(
         }, ct);
 
         // Duplicate/mismatch gate: if this face already looks like someone else, don't silently enroll it
-        // under a new name. (FindNearest is async, so it stays outside the Task.Run above.)
+        // under a new identity. (FindNearest is async, so it stays outside the Task.Run above.)
         if (!allowDuplicate && options.GateEnrollmentOnRecognition)
         {
             var hits = await store.FindNearest(embedding, options.CandidateCount, ct);
             if (hits.Count > 0 &&
                 hits[0].Distance <= options.MaxDistance &&
-                !String.Equals(hits[0].Person.Name, name2, StringComparison.OrdinalIgnoreCase))
+                !String.Equals(hits[0].Person.PersonIdentifier, id, StringComparison.OrdinalIgnoreCase))
             {
                 throw new FaceEnrollmentConflictException(
-                    new RecognitionResult(hits[0].Person.Name, hits[0].Distance, hits[0].Person.Id));
+                    new RecognitionResult(hits[0].Person.PersonIdentifier, hits[0].Distance, hits[0].Person.Id));
             }
         }
 
         var person = new Person
         {
             Id = Guid.NewGuid().ToString("n"),
-            Name = name2,
+            PersonIdentifier = id,
             Embedding = embedding,
             Thumbnail = thumbnail,
             EnrolledAt = DateTimeOffset.UtcNow
@@ -96,7 +96,7 @@ public class FaceIntelligenceManager(
 
     public Task<IReadOnlyList<Person>> GetAll(CancellationToken ct = default) => store.GetAll(ct);
 
-    public Task<int> Forget(string name, CancellationToken ct = default) => store.RemoveByName(name, ct);
+    public Task<int> Forget(string personIdentifier, CancellationToken ct = default) => store.RemoveByPersonIdentifier(personIdentifier, ct);
 
     async Task<RecognitionResult> Match(ReadOnlyMemory<float> query, CancellationToken ct)
     {
@@ -107,11 +107,11 @@ public class FaceIntelligenceManager(
         var best = hits[0];
         if (best.Distance > options.MaxDistance)
             // A near miss and a total stranger are both "no match", but they mean completely different
-            // things when tuning MaxDistance — so report how close the nearest actually got. Name stays
+            // things when tuning MaxDistance — so report how close the nearest actually got. The identifier stays
             // null, so IsMatch is still false and callers that only check IsMatch are unaffected.
             return new RecognitionResult(null, best.Distance, null);
 
-        return new RecognitionResult(best.Person.Name, best.Distance, best.Person.Id);
+        return new RecognitionResult(best.Person.PersonIdentifier, best.Distance, best.Person.Id);
     }
 
     /// <summary>

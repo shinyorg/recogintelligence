@@ -31,6 +31,6 @@ public class DocumentDbFaceStore(IDocumentStore store) : IFaceStore
     public Task<IReadOnlyList<Person>> GetAll(CancellationToken ct = default)
         => store.Query<Person>().OrderByDescending(p => p.EnrolledAt).ToList(ct);
 
-    public Task<int> RemoveByName(string name, CancellationToken ct = default)
-        => store.Query<Person>().Where(p => p.Name == name).ExecuteDelete(ct);
+    public Task<int> RemoveByPersonIdentifier(string personIdentifier, CancellationToken ct = default)
+        => store.Query<Person>().Where(p => p.PersonIdentifier == personIdentifier).ExecuteDelete(ct);
 }
