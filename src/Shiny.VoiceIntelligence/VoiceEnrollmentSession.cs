@@ -81,10 +81,19 @@ public class VoiceEnrollmentSession
     public VoiceEnrollmentOptions Options { get; }
 
     /// <summary>
-    /// The sentence to show for the next recording. Rotates every attempt (accepted or not) so nobody reads
-    /// the same line twice in a row.
+    /// Index into <see cref="VoiceEnrollmentOptions.Prompts"/> of the sentence to read next.
     /// </summary>
-    public string CurrentPrompt => this.Options.Prompts[this.attempts % this.Options.Prompts.Count];
+    /// <remarks>
+    /// Advances on an <b>accepted</b> recording, not on every attempt — a rejected clip is asked for again
+    /// on the same sentence. Rotating on every attempt reads as "the wizard is cycling and nothing I do
+    /// matters", and there is nothing to gain from moving on: the model is text-independent, so varying the
+    /// words buys the embedding nothing, while re-reading a line you already know isolates the thing that
+    /// actually failed (too quiet, too much room noise) and makes progress legible.
+    /// </remarks>
+    public int CurrentPromptIndex => this.accepted.Count % this.Options.Prompts.Count;
+
+    /// <summary>The sentence to show for the next recording.</summary>
+    public string CurrentPrompt => this.Options.Prompts[this.CurrentPromptIndex];
 
     /// <summary>How many recordings have been kept so far.</summary>
     public int AcceptedCount => this.accepted.Count;
@@ -186,6 +195,33 @@ public class VoiceEnrollmentSession
     }
 
     /// <summary>
+    /// Stop asking for recordings and store the best of what has been accepted, exactly as the session does
+    /// for itself when it runs out of attempts: prune the recordings that disagree most, down to
+    /// <see cref="VoiceEnrollmentOptions.MinSamples"/>, then store.
+    /// </summary>
+    /// <remarks>
+    /// For a caller that imposes its own ceiling — a UI that will not ask someone to read a fifteenth
+    /// sentence. Without this, abandoning a run stores <i>nothing</i>: <see cref="Submit"/> only writes on
+    /// the call that completes the session, so a person who recorded four usable clips in a noisy room would
+    /// walk away with no enrollment at all.
+    /// </remarks>
+    /// <returns>
+    /// The stored result, or <c>null</c> when fewer than <see cref="VoiceEnrollmentOptions.MinSamples"/>
+    /// recordings were accepted — there is nothing worth storing, and a one-clip "enrollment" is exactly the
+    /// weak template this whole session exists to prevent. Returns the existing result if already complete.
+    /// </returns>
+    public async Task<VoiceEnrollmentResult?> Finish(CancellationToken ct = default)
+    {
+        if (this.IsComplete)
+            return this.Result;
+        if (this.accepted.Count < this.Options.MinSamples)
+            return null;
+
+        this.PruneToFit();
+        return await this.Store(this.Cohesion <= this.Options.MaxCohesionDistance, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Discard everything and start over. Safe at any point — recordings accepted before completion were
     /// never written anywhere. Does not remove speakers stored by a completed session (use
     /// <see cref="IVoiceIntelligence.Forget"/> for that).
@@ -209,12 +245,19 @@ public class VoiceEnrollmentSession
         if (this.accepted.Count < this.Options.MaxSamples)
             return null;   // keep asking
 
-        // Out of attempts. Drop the recordings that disagree most with the rest — one loose clip poisons a
-        // set that is otherwise fine — down to the minimum count, then store whatever that leaves.
+        // Out of attempts — keep the best subset, same as an explicit Finish().
+        this.PruneToFit();
+        return await this.Store(this.Cohesion <= this.Options.MaxCohesionDistance, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Drop the recordings that disagree most with the rest — one loose clip poisons a set that is otherwise
+    /// fine — down to <see cref="VoiceEnrollmentOptions.MinSamples"/> or until the set is coherent.
+    /// </summary>
+    void PruneToFit()
+    {
         while (this.accepted.Count > this.Options.MinSamples && this.Cohesion > this.Options.MaxCohesionDistance)
             this.accepted.RemoveAt(this.WorstIndex());
-
-        return await this.Store(this.Cohesion <= this.Options.MaxCohesionDistance, ct).ConfigureAwait(false);
     }
 
     async Task<VoiceEnrollmentResult> Store(bool confident, CancellationToken ct)

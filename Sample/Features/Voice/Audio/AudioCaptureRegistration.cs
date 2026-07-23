@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Shiny.VoiceIntelligence.Maui;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Sample.Features.Voice.Audio;
@@ -18,6 +19,8 @@ public static class AudioCaptureRegistration
         services.TryAddSingleton<IAudioSource, NullAudioSource>();
 #endif
         services.TryAddSingleton<VoiceRecorder>();
+        // The same instance behind the library seam VoiceEnrollmentView resolves.
+        services.TryAddSingleton<IVoiceRecorder>(sp => sp.GetRequiredService<VoiceRecorder>());
         return services;
     }
 }

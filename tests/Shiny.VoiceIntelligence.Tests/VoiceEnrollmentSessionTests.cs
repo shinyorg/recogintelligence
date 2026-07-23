@@ -207,7 +207,28 @@ public class VoiceEnrollmentSessionTests : IDisposable
     }
 
     [Fact]
-    public async Task Prompts_Rotate_And_Submitting_After_Completion_Throws()
+    public async Task RejectedRecording_StaysOnTheSameSentence()
+    {
+        RequireVec0();
+        var voice = this.Create();
+        var session = voice.CreateEnrollment("Allan", Silent());
+
+        await session.Submit(Voice(0));
+        var prompt = session.CurrentPrompt;
+        var index = session.CurrentPromptIndex;
+
+        // Far enough out to be rejected: the person gets the same line again rather than being moved along,
+        // which is what makes "keep going until it passes" legible instead of looking like a cycle.
+        var step = await session.Submit(Voice(80));
+
+        Assert.False(step.Accepted);
+        Assert.Equal(prompt, session.CurrentPrompt);
+        Assert.Equal(index, session.CurrentPromptIndex);
+        Assert.Equal(2, session.AttemptCount);   // the attempt still counted
+    }
+
+    [Fact]
+    public async Task Prompts_Advance_OnAcceptance_AndSubmittingAfterCompletionThrows()
     {
         RequireVec0();
         var voice = this.Create();
@@ -226,6 +247,75 @@ public class VoiceEnrollmentSessionTests : IDisposable
         session.Reset();
         Assert.False(session.IsComplete);
         Assert.Equal(0, session.AcceptedCount);
+    }
+
+    [Fact]
+    public async Task Finish_StoresTheBestSubset_WhenTheCallerStopsAsking()
+    {
+        RequireVec0();
+        var voice = this.Create();
+
+        // A caller with its own ceiling (VoiceEnrollmentView.MaxAttempts) gives up before the session's
+        // own MaxSamples is reached. Without Finish(), everything recorded so far is thrown away.
+        var options = Silent();
+        options.MinSamples = 2;
+        options.MaxSamples = 10;
+        options.MaxCohesionDistance = 0.05f;
+        options.MaxOutlierDistance = 0.5f;
+
+        var session = voice.CreateEnrollment("Allan", options);
+        await session.Submit(Voice(0));
+        await session.Submit(Voice(26));            // ~0.10 apart — never coherent enough to self-complete
+        Assert.False(session.IsComplete);
+
+        var result = await session.Finish();
+
+        Assert.NotNull(result);
+        Assert.True(session.IsComplete);
+        Assert.False(result!.IsConfident);          // kept, but flagged
+        Assert.Equal(2, result.Speakers.Count);
+        Assert.Equal(2, (await voice.GetAll()).Count);
+    }
+
+    [Fact]
+    public async Task Finish_StoresNothing_WhenTooFewRecordingsWereAccepted()
+    {
+        RequireVec0();
+        var voice = this.Create();
+
+        var options = Silent();
+        options.MinSamples = 3;
+
+        var session = voice.CreateEnrollment("Allan", options);
+        await session.Submit(Voice(0));
+
+        // One clip is not an enrollment — storing it would create exactly the weak single-template set the
+        // whole session exists to prevent, so the caller gets null and nothing is written.
+        var result = await session.Finish();
+
+        Assert.Null(result);
+        Assert.False(session.IsComplete);
+        Assert.Empty(await voice.GetAll());
+    }
+
+    [Fact]
+    public async Task Finish_OnACompletedSession_IsANoOp()
+    {
+        RequireVec0();
+        var voice = this.Create();
+
+        var options = Silent();
+        options.MinSamples = 2;
+
+        var session = voice.CreateEnrollment("Allan", options);
+        await session.Submit(Voice(0));
+        await session.Submit(Voice(2));
+        Assert.True(session.IsComplete);
+
+        var again = await session.Finish();
+
+        Assert.Same(session.Result, again);
+        Assert.Equal(2, (await voice.GetAll()).Count);   // not stored twice
     }
 
     [Fact]

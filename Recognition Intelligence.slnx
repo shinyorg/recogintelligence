@@ -18,6 +18,7 @@
     <Project Path="src\Shiny.VoiceIntelligence.Onnx\Shiny.VoiceIntelligence.Onnx.csproj" />
     <Project Path="src\Shiny.VoiceIntelligence.DocumentDb\Shiny.VoiceIntelligence.DocumentDb.csproj" />
     <Project Path="src\Shiny.VoiceIntelligence.DocumentDb.Sqlite\Shiny.VoiceIntelligence.DocumentDb.Sqlite.csproj" />
+    <Project Path="src\Shiny.VoiceIntelligence.Maui\Shiny.VoiceIntelligence.Maui.csproj" />
     <Project Path="tests\Shiny.FaceIntelligence.TestKit\Shiny.FaceIntelligence.TestKit.csproj" />
     <Project Path="tests\Shiny.FaceIntelligence.Tests\Shiny.FaceIntelligence.Tests.csproj" />
     <Project Path="tests\Shiny.FaceIntelligence.Benchmarks\Shiny.FaceIntelligence.Benchmarks.csproj" />

@@ -1,3 +1,5 @@
+using Shiny.VoiceIntelligence.Maui;
+
 namespace Sample.Features.Voice.Audio;
 
 /// <summary>
@@ -5,12 +7,16 @@ namespace Sample.Features.Voice.Audio;
 /// return the utterance as the mono <c>float[]</c> at 16 kHz that <c>IVoiceIntelligence</c> expects.
 /// Owns permission (MAUI Microphone), capture lifetime, float32→resample→16 kHz normalization.
 /// </summary>
-public class VoiceRecorder(IAudioSource source)
+public class VoiceRecorder(IAudioSource source) : IVoiceRecorder
 {
     const int TargetSampleRate = 16000;
 
     /// <summary>Record for <paramref name="duration"/> and return mono 16 kHz samples in [-1, 1].</summary>
-    public async Task<float[]> RecordAsync(TimeSpan duration, CancellationToken ct = default)
+    public Task<float[]> RecordAsync(TimeSpan duration, CancellationToken ct = default)
+        => this.RecordAsync(duration, null, ct);
+
+    /// <inheritdoc cref="IVoiceRecorder.RecordAsync(TimeSpan, IProgress{float}, CancellationToken)"/>
+    public async Task<float[]> RecordAsync(TimeSpan duration, IProgress<float>? level, CancellationToken ct = default)
     {
         var status = await Permissions.RequestAsync<Permissions.Microphone>();
         if (status != PermissionStatus.Granted)
@@ -33,6 +39,9 @@ public class VoiceRecorder(IAudioSource source)
                     if (read <= 0)
                         break;
                     ms.Write(buffer, 0, read);
+                    // Report the level from the CAPTURED chunk, before resampling — the meter should show
+                    // what the mic is hearing right now, not what the pipeline produces at the end.
+                    level?.Report(ChunkRms(buffer, read));
                 }
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
@@ -97,6 +106,22 @@ public class VoiceRecorder(IAudioSource source)
     }
 
     /// <summary>Reinterpret the captured little-endian float32 bytes as a float sample array.</summary>
+    /// <summary>RMS of one captured chunk (native float32 mono), for the VU meter.</summary>
+    static float ChunkRms(byte[] bytes, int count)
+    {
+        var samples = count / sizeof(float);
+        if (samples == 0)
+            return 0f;
+
+        double sum = 0;
+        for (var i = 0; i < samples; i++)
+        {
+            var v = BitConverter.ToSingle(bytes, i * sizeof(float));
+            sum += (double)v * v;
+        }
+        return (float)Math.Sqrt(sum / samples);
+    }
+
     static float[] ToFloatSamples(byte[] bytes, int byteCount)
     {
         var count = byteCount / sizeof(float);
