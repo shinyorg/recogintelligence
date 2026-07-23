@@ -15,7 +15,7 @@ public class TextRecognizer : ITextRecognizer
 {
     public bool IsSupported => true;
 
-    public async Task<RecognizedText> RecognizeAsync(byte[] imageData, CancellationToken cancellationToken = default)
+    public async Task<RecognizedText> RecognizeAsync(byte[] imageData, TextRecognitionOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(imageData);
         cancellationToken.ThrowIfCancellationRequested();

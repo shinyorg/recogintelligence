@@ -87,7 +87,7 @@ public class DocumentExtractorTests
 
         public bool IsSupported => true;
 
-        public Task<RecognizedText> RecognizeAsync(byte[] imageData, CancellationToken cancellationToken = default)
+        public Task<RecognizedText> RecognizeAsync(byte[] imageData, TextRecognitionOptions options, CancellationToken cancellationToken = default)
         {
             if (this.throwOnUse)
                 throw new InvalidOperationException("OCR should not have been called on this path.");

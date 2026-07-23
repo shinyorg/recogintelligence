@@ -3,7 +3,8 @@ namespace Shiny.DocumentIntelligence;
 /// <summary>
 /// The kind of document to extract structured data from. Selects which extraction strategy
 /// <see cref="IDocumentExtractor"/> uses: OCR + heuristic parsing for <see cref="Receipt"/>/<see cref="Invoice"/>,
-/// PDF417 barcode decode for <see cref="DriversLicense"/>, and MRZ OCR for <see cref="Passport"/>.
+/// PDF417 barcode decode for <see cref="DriversLicense"/>, MRZ OCR for <see cref="Passport"/>, and
+/// Luhn-validated OCR for <see cref="CreditCard"/>.
 /// </summary>
 public enum DocumentType
 {
@@ -20,5 +21,11 @@ public enum DocumentType
     DriversLicense,
 
     /// <summary>A passport. OCR + ICAO 9303 parse of the machine-readable zone (MRZ).</summary>
-    Passport
+    Passport,
+
+    /// <summary>
+    /// A payment card, front side. OCR + Luhn-validated PAN, expiry, cardholder and network. The CVV is
+    /// never read — see <see cref="CreditCardData"/>.
+    /// </summary>
+    CreditCard
 }

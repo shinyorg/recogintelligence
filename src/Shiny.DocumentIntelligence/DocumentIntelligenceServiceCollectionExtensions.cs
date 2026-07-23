@@ -11,6 +11,7 @@ public static class DocumentIntelligenceServiceCollectionExtensions
     /// <item><see cref="IDocumentScanner"/> — native capture (VisionKit iOS/Mac Catalyst, ML Kit Android, Vision segmentation macOS; throwing stub elsewhere).</item>
     /// <item><see cref="ITextRecognizer"/> — native OCR (Apple Vision / Android ML Kit; throwing stub elsewhere).</item>
     /// <item><see cref="IBarcodeReader"/> — native barcode/PDF417 decode (Apple Vision / Android ML Kit; throwing stub elsewhere).</item>
+    /// <item><see cref="IDataDetector"/> — dates/addresses/phones/links from recognized text (Apple <c>NSDataDetector</c>; inert elsewhere).</item>
     /// <item><see cref="IDocumentExtractor"/> — cross-platform orchestrator turning scans into <see cref="ExtractedDocument"/>.</item>
     /// </list>
     /// </summary>
@@ -19,6 +20,7 @@ public static class DocumentIntelligenceServiceCollectionExtensions
         services.TryAddSingleton<IDocumentScanner, DocumentScanner>();
         services.TryAddSingleton<ITextRecognizer, TextRecognizer>();
         services.TryAddSingleton<IBarcodeReader, BarcodeReader>();
+        services.TryAddSingleton<IDataDetector, DataDetector>();
         services.TryAddSingleton<IDocumentExtractor, DocumentExtractor>();
         return services;
     }

@@ -17,7 +17,7 @@ public class TextRecognizer : ITextRecognizer
         OperatingSystem.IsMacCatalystVersionAtLeast(13) ||
         OperatingSystem.IsMacOSVersionAtLeast(10, 15);
 
-    public Task<RecognizedText> RecognizeAsync(byte[] imageData, CancellationToken cancellationToken = default)
+    public Task<RecognizedText> RecognizeAsync(byte[] imageData, TextRecognitionOptions options, CancellationToken cancellationToken = default)
     {
         if (!this.IsSupported)
             throw new PlatformNotSupportedException("Apple Vision text recognition requires iOS/Mac Catalyst 13 or macOS 10.15+.");
@@ -39,8 +39,10 @@ public class TextRecognizer : ITextRecognizer
             using var request = new VNRecognizeTextRequest(completionHandler: null)
             {
                 RecognitionLevel = VNRequestTextRecognitionLevel.Accurate,
-                UsesLanguageCorrection = true
+                UsesLanguageCorrection = options.UseLanguageCorrection
             };
+            if (options.MinimumTextHeight > 0f)
+                request.MinimumTextHeight = options.MinimumTextHeight;
 
             using var handler = new VNImageRequestHandler(cgImage, new NSDictionary());
             if (!handler.Perform([request], out var error) || error is not null)

@@ -5,6 +5,6 @@ public class TextRecognizer : ITextRecognizer
 {
     public bool IsSupported => false;
 
-    public Task<RecognizedText> RecognizeAsync(byte[] imageData, CancellationToken cancellationToken = default) =>
+    public Task<RecognizedText> RecognizeAsync(byte[] imageData, TextRecognitionOptions options, CancellationToken cancellationToken = default) =>
         throw new PlatformNotSupportedException("On-device text recognition is not supported on this platform.");
 }

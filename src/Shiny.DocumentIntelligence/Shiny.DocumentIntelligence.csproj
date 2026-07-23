@@ -30,9 +30,10 @@
     <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'macos'">
         <Compile Include="Platforms/MacOS/**/*.cs" />
     </ItemGroup>
-    <!-- Vision OCR + barcode decode are identical across the three Apple platforms (no UIKit/AppKit split). -->
+    <!-- Code identical across the three Apple platforms (no UIKit/AppKit split): Vision OCR + barcode
+         decode, and the Foundation NSDataDetector. -->
     <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'ios' Or '$(TargetPlatformIdentifier)' == 'maccatalyst' Or '$(TargetPlatformIdentifier)' == 'macos'">
-        <Compile Include="Platforms/AppleVision/**/*.cs" />
+        <Compile Include="Platforms/AppleShared/**/*.cs" />
     </ItemGroup>
     <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'android'">
         <Compile Include="Platforms/Android/**/*.cs" />

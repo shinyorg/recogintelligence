@@ -25,9 +25,24 @@ public class ExtractedDocument
     /// <summary>Populated when <see cref="Type"/> is <see cref="DocumentType.Passport"/> and the MRZ parsed.</summary>
     public PassportData? Passport { get; init; }
 
+    /// <summary>
+    /// Populated when <see cref="Type"/> is <see cref="DocumentType.CreditCard"/> and a card number was
+    /// read. Check <see cref="CreditCardData.IsValid"/> — a result is returned even when the Luhn check
+    /// fails, so the UI can show what was read rather than silently reporting nothing.
+    /// </summary>
+    public CreditCardData? CreditCard { get; init; }
+
+    /// <summary>
+    /// Dates, addresses, phone numbers and links the platform data detector found in <see cref="RawText"/>.
+    /// Empty where no detector is available (see <see cref="IDataDetector"/>) — this is enrichment on top of
+    /// the typed payloads, never a replacement for them.
+    /// </summary>
+    public IReadOnlyList<DetectedEntity> Entities { get; init; } = [];
+
     /// <summary>True when the type-specific parser produced a payload. False means OCR ran but nothing structured came out.</summary>
     public bool HasStructuredData =>
-        this.Receipt is not null || this.Invoice is not null || this.License is not null || this.Passport is not null;
+        this.Receipt is not null || this.Invoice is not null || this.License is not null ||
+        this.Passport is not null || this.CreditCard is not null;
 }
 
 /// <summary>A single line item on a receipt or invoice.</summary>
