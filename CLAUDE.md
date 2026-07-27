@@ -115,6 +115,82 @@ Key design points when extending:
 - **Packing happens on build, not via `dotnet pack`**: `Directory.Build.props` sets `GeneratePackageOnBuild` + `PackageOutputPath=artifacts/` for `Configuration=Release` only, so every package (and `.snupkg`) lands in one folder the workflow uploads and pushes. Debug builds pack nothing.
 - Shared package metadata (authors, MIT, icon, readme, repo url) lives in `Directory.Build.props`; each csproj supplies only its own `<Description>`. `nuget.png`/`nuget.txt` are the standard Shiny package assets. Tests and the Sample carry `IsPackable=false`.
 
+## Documentation site
+
+The public documentation lives in a **separate** repo at `~/Desktop/dev/documentation` (Astro + Starlight, rendered to https://shinylib.net). This repo's pages are under `src/content/docs/`:
+
+| Folder | Covers |
+|---|---|
+| `faceintelligence/` | `Shiny.FaceIntelligence` + `.Onnx` / `.DocumentDb` / `.DocumentDb.Sqlite` / `.Maui` |
+| `voiceintelligence/` | `Shiny.VoiceIntelligence` + `.Onnx` / `.DocumentDb` / `.DocumentDb.Sqlite` / `.Maui` |
+| `documentintelligence/` | `Shiny.DocumentIntelligence` (scanner + extraction) |
+
+Sidebar entries live in `~/Desktop/dev/documentation/src/sidebar-topics.mjs` (topic **On-Device Intelligence**) and the homepage card is in `src/content/docs/index.mdx`. **A new page is invisible until it is added to `sidebar-topics.mjs`.**
+
+A change is not "done" until code, tests, and the docs are in sync — do them in the same change unless there's a reason not to:
+
+1. **Code + tests** (`src/`, `tests/`) — run the full suite (`dotnet test tests/Shiny.FaceIntelligence.Tests/...` and `tests/Shiny.VoiceIntelligence.Tests/...`), not a filtered subset, and prove new behavior with a test.
+2. **Documentation site** — update the relevant feature page, plus a **release note** (rules below).
+3. **README.md** (repo root) — packed into every NuGet package via `PackageReadmeFile` in `Directory.Build.props`. Update the feature list/table when behavior or packaging changes.
+
+Pages are `.mdx`. Conventions to match: frontmatter `title:` is required; `PlatformSupport`, `NugetBadge`/`NugetDownloads`, `GitHubStars` and `Alert`/`Aside` components are imported with absolute `/src/components/...` paths. Run `npm run build` in the documentation repo after non-trivial edits — MDX errors only surface at build time. **Verify API surface against `src/` here rather than inventing it** — the docs repo has no way to check.
+
+### Release notes
+
+Release notes live per-library in the documentation repo: `src/content/docs/{faceintelligence,voiceintelligence,documentintelligence}/release-notes.mdx`.
+
+**Which version does a note go against?** The `version` field in `version.json` (Nerdbank.GitVersioning) — the **raw version portion only** (strip the prerelease/height suffix, e.g. `1.0.0-beta.{height}` → `1.0.0`).
+
+**Heading style — match the existing file.** Feature/minor releases are headed by `major.minor` (`## 1.1 - August 3, 2026`); patch releases use the full `major.minor.patch`.
+
+**If the version isn't released yet** (this repo is entirely `-beta` today, so this is the normal case):
+- If a `## <version> TBD` heading already exists, add the note under it. If you're changing a feature that hasn't shipped yet (already an entry under `TBD`), **edit that entry in place** rather than adding a duplicate.
+- Otherwise create a new `## <version> TBD` heading at the top and add the note there.
+
+**If the version is a final release**, the section is dated; add the note under the matching dated section (or promote `TBD` to a dated heading when cutting the release).
+
+Each note is a single `<RN>` line (`import RN from '/src/components/ReleaseNote.astro'`) with `type="feature|enhancement|fix|breaking"`. Newest version section stays at the top. An `<RN>` containing a code fence needs its opening/closing tags on their own lines or the MDX build fails.
+
+## Blog posts (only when explicitly requested)
+
+Do **not** write blog posts automatically as part of a fix/feature. Write them **only when the user asks**. When asked to blog a feature, produce **two** posts — first the docs-site version, then adapt it for the personal blog.
+
+### 1. Docs site — `~/Desktop/dev/documentation`
+
+- File: `src/content/docs/blog/YYYY/MM/<slug>.mdx` (current year/month folders; create the month folder if needed).
+- Frontmatter:
+  ```yaml
+  ---
+  title: '...'
+  description: '...'
+  date: YYYY-MM-DD
+  authors:
+    - allanritchie
+  tags:
+    - Release        # or Feature, AI, etc.
+  ---
+  ```
+- Body is MDX. Reuse components where relevant, e.g. `import NugetBadge from '/src/components/NugetBadge.astro';` then `<NugetBadge name="Shiny.FaceIntelligence" />`.
+- Voice: product/release-note tone — what shipped, breaking changes, code samples, how to use it. **No hero image** on this site.
+
+### 2. Personal blog — `~/Desktop/dev/blog` (adapt the docs post)
+
+- File: `src/content/blog/YYYY/MM/<slug>.mdx` (note: `content/blog`, not `content/docs/blog`).
+- Frontmatter (different schema — see `src/content.config.ts`):
+  ```yaml
+  ---
+  title: '...'
+  description: '...'
+  pubDate: 'Mon DD YYYY'                          # e.g. 'Jul 27 2026'
+  heroImage: '../../../../assets/<slug>-hero.svg'
+  tags: ['Shiny', '.NET']
+  ---
+  ```
+- Voice: rework the docs post into a personal, first-person narrative ("Here's something that shouldn't be hard but is…", "So I built…") — story/motivation up front, not a dry changelog.
+- **Hero image is required.** Create `src/assets/<slug>-hero.svg`:
+  - SVG, `viewBox="0 0 1200 630"`, `width="1200" height="630"`.
+  - Match the house style: dark navy/indigo gradient background (`#0f172a` → `#1e1b4b`), cyan/green/violet accent gradients, subtle glow filters, the feature name as the headline. Crib an existing one (e.g. `datasync-hero.svg`, `documentdb-orleans-hero.svg`) as a starting template.
+
 ## Architecture (the parts that span files)
 
 **Type/interface placement convention.** Namespaces are **flat** (folder ≠ namespace — e.g. everything in `Shiny.DocumentIntelligence/Extraction/` is `namespace Shiny.DocumentIntelligence`), so folders are purely organizational and moving a file between them is a same-namespace, zero-code change. Files are split by audience:

@@ -37,7 +37,7 @@ jobs:
       with:
           dotnet-version: '10.0.x'
           # macos is required by Shiny.DocumentIntelligence's net10.0-macos (AppKit) target
-          workloads: ios, android, maccatalyst, macos
+          workloads: maui, ios, android, maccatalyst, macos
 
     - name: Build
       run: dotnet build build.slnf /restore -m -property:Configuration=Release -property:PublicRelease=true

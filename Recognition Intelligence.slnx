@@ -1,6 +1,7 @@
 <Solution>
     <Folder Name="/Solution/">
         <File Path=".github\workflows\build.yml" />
+        <File Path="build.slnf" />
         <File Path="CLAUDE.md" />
         <File Path="Directory.Build.props" />
         <File Path="Directory.Packages.props" />
