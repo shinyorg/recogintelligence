@@ -2,5 +2,43 @@
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+
+        <Authors>aritchie;ShinyLib</Authors>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/shinyorg/recogintelligence</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/shinyorg/recogintelligence</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+
+        <PackageIcon>icon.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageTags>face recognition biometrics voice speaker arcface ecapa document scanner ocr onnx maui shiny ios android</PackageTags>
     </PropertyGroup>
+
+    <!-- Packing happens as part of a Release build (CI runs `dotnet build ... -property:Configuration=Release`),
+         and every package lands in one folder so the workflow can upload/push `artifacts/*.nupkg`. -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts</PackageOutputPath>
+        <IncludeSource>True</IncludeSource>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <PublishRepositoryUrl>True</PublishRepositoryUrl>
+        <EmbedUntrackedSources>True</EmbedUntrackedSources>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Version comes from version.json (height-based); the workflow passes PublicRelease=true. -->
+        <PackageReference Include="Nerdbank.GitVersioning">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <!-- Package assets. Inert in the Sample/test projects (IsPackable=false => nothing packs). -->
+    <ItemGroup>
+        <None Include="$(MSBuildThisFileDirectory)nuget.png" Pack="true" PackagePath="icon.png" Visible="false"/>
+        <None Include="$(MSBuildThisFileDirectory)nuget.txt" Pack="true" PackagePath="readme.txt" Visible="false"/>
+        <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false"/>
+    </ItemGroup>
 </Project>

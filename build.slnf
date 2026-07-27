@@ -1,0 +1,18 @@
+{
+    "solution": {
+        "path": "Recognition Intelligence.slnx",
+        "projects": [
+            "src\\Shiny.DocumentIntelligence\\Shiny.DocumentIntelligence.csproj",
+            "src\\Shiny.FaceIntelligence\\Shiny.FaceIntelligence.csproj",
+            "src\\Shiny.FaceIntelligence.Onnx\\Shiny.FaceIntelligence.Onnx.csproj",
+            "src\\Shiny.FaceIntelligence.DocumentDb\\Shiny.FaceIntelligence.DocumentDb.csproj",
+            "src\\Shiny.FaceIntelligence.DocumentDb.Sqlite\\Shiny.FaceIntelligence.DocumentDb.Sqlite.csproj",
+            "src\\Shiny.FaceIntelligence.Maui\\Shiny.FaceIntelligence.Maui.csproj",
+            "src\\Shiny.VoiceIntelligence\\Shiny.VoiceIntelligence.csproj",
+            "src\\Shiny.VoiceIntelligence.Onnx\\Shiny.VoiceIntelligence.Onnx.csproj",
+            "src\\Shiny.VoiceIntelligence.DocumentDb\\Shiny.VoiceIntelligence.DocumentDb.csproj",
+            "src\\Shiny.VoiceIntelligence.DocumentDb.Sqlite\\Shiny.VoiceIntelligence.DocumentDb.Sqlite.csproj",
+            "src\\Shiny.VoiceIntelligence.Maui\\Shiny.VoiceIntelligence.Maui.csproj"
+        ]
+    }
+}

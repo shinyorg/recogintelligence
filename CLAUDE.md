@@ -36,11 +36,11 @@ Note on naming: types/namespaces use **FaceIntelligence** as the product brand (
 ## Build & run
 
 ```bash
-# Everything
-dotnet build Shiny.FaceIntelligence.slnx
+# Everything (solution name has a space in it)
+dotnet build "Recognition Intelligence.slnx"
 
-# Pack all packages (the .Onnx package ships the iOS linker targets — see below)
-dotnet pack Shiny.FaceIntelligence.slnx -c Release -o ./artifacts
+# What CI builds: the 11 shippable packages only, packed on build (see Packaging & CI)
+dotnet build build.slnf /restore -m -property:Configuration=Release -property:PublicRelease=true
 
 # Sample app heads (Sample/ is at the repo root, not under src/)
 dotnet build Sample/Sample.csproj -f net10.0-android
@@ -104,7 +104,16 @@ Key design points when extending:
 - **vec0 is required at runtime**; tests `Assert.Skip` when `Vec0Locator.Find()` returns null (except `Vec0Binary_IsAvailable_OnDeveloperMachine`, which asserts presence to document the dependency). `Vec0Locator` searches next to the assembly and walks up to the committed `runtimes/` folder so BenchmarkDotNet's generated subprocess finds it.
 - These need **no ONNX model** — the model only matters for the real embedder, which isn't exercised here.
 
-`nuget.config` clears sources and adds the public **dnceng `dotnet10` feed** alongside nuget.org — it serves the `Microsoft.Maui.Controls 10.0.71` build that the prerelease Shiny camera controls target. The Sample pins `10.0.71` to avoid an NU1605 downgrade. Don't remove the feed or bump MAUI independently of the camera package.
+`nuget.config` clears sources and restores from **nuget.org only** (the dnceng `dotnet10` feed it once carried is gone — everything the repo needs now ships publicly). Still don't bump MAUI independently of the prerelease Shiny camera package: they move together, see `Directory.Packages.props`.
+
+## Packaging & CI
+
+`.github/workflows/build.yml` (macos-latest, `ios/android/maccatalyst/macos` workloads — `macos` is there for `Shiny.DocumentIntelligence`'s AppKit target) builds **`build.slnf`** in Release and pushes to nuget.org from `main` and `v*` branches using the `NUGETAPIKEY` secret. Adapted from `~/Desktop/dev/music`, which is the reference layout for every Shiny repo.
+
+- **`build.slnf` is the shipping surface** — the 11 `src/` projects, nothing else. The Sample never builds in CI (it needs the gitignored ONNX models, and its Android head doesn't build at all), and neither do the tests. **Add a new package to `build.slnf` or it is silently never published.**
+- **Versioning is Nerdbank.GitVersioning** (`version.json`, `1.0.0-beta.{height}`), referenced globally from `Directory.Build.props`. The workflow needs `fetch-depth: 0` — a shallow clone has no height. `PublicRelease=true` is passed on the command line, which is what drops the `-g<commit>` suffix.
+- **Packing happens on build, not via `dotnet pack`**: `Directory.Build.props` sets `GeneratePackageOnBuild` + `PackageOutputPath=artifacts/` for `Configuration=Release` only, so every package (and `.snupkg`) lands in one folder the workflow uploads and pushes. Debug builds pack nothing.
+- Shared package metadata (authors, MIT, icon, readme, repo url) lives in `Directory.Build.props`; each csproj supplies only its own `<Description>`. `nuget.png`/`nuget.txt` are the standard Shiny package assets. Tests and the Sample carry `IsPackable=false`.
 
 ## Architecture (the parts that span files)
 
@@ -415,7 +424,7 @@ Voice now has three Sample tabs — **Voice ID** (`VoiceRecognizePage`), **Voice
 
 **Voice Enroll is now just the control**: the page hosts [`VoiceEnrollmentView`](#the-voice-enrollment-control-shinyvoiceintelligencemaui), supplies the name as the identifier, and reports `Completed`/`Failed` — no recording loop, no prompt rotation, no Record button. It mirrors the face `EnrollPage` exactly (page starts the control, VM renders the outcome). `VoiceEnrollPage` sets `RecordFor` from `VoiceTuning.RecordFor` rather than leaving the control's default, so enroll and identify can't drift apart. (`IsNotEnrolling` on the VM exists purely so the XAML can hide the name entry without an inverse-bool converter.)
 
-**Mic capture is vendored, not a package.** `Shiny.Audio` is *not* published to NuGet, so its capture impls were copied into the Sample rather than referenced: `Sample/Platforms/iOS/AppleAudioSource.cs` (`AVAudioEngine` tap) + `Sample/Platforms/Android/AndroidAudioSource.cs` (`AudioRecord`), both `public class … : IAudioSource` in namespace `Sample.Features.Voice.Audio` so `AddAudioCapture()` picks the right one per-TFM via `#if IOS/ANDROID` (a `NullAudioSource` stub covers MacCatalyst/Windows). **Format normalization is deliberate**: the shared `IAudioSource` contract yields **float32 mono** at the device's native rate (the vendored Apple source's `desiredFormat` was never applied — it taps at hardware rate), and **`VoiceRecorder` resamples to the 16 kHz** the embedder needs (Android is already 16 kHz → no-op; Apple ~48 kHz → linear resample). `VoiceRecorder.RecordAsync(TimeSpan)` is the single seam the pages use: it owns the **MAUI `Permissions.Microphone`** request, capture lifetime, and PCM→float→resample. Needs `NSMicrophoneUsageDescription` (iOS) + `RECORD_AUDIO` (Android), both added. Still needs a real ECAPA `.onnx` bundled at `Sample/Resources/Raw/ecapa.onnx` (gitignored, supplied per build, same as `arcface.onnx`); missing model surfaces as a "model missing" message on the voice pages, not a crash.
+**Mic capture is vendored — but only until the next `Shiny.Audio` beta lands (2026-07-27).** `Shiny.Audio` *is* published now (`3.0.0-beta-0017`), so the vendored copies are going away. What blocked the swap: its `AppleAudioSource` hard-coded `AVAudioSessionMode.VoiceChat` + `AllowBluetooth`/`A2DP` — precisely the two settings [measured here](#audio-capture-is-the-fragile-part-not-the-threshold-settled--measured-2026-07-22) as the cause of speaker-match failure, and `AudioProcessingOptions.None` didn't turn them off. `~/Desktop/dev/speech` has been patched (mode is `Measurement` unless processing is requested; new `AudioProcessingOptions.AllowBluetooth` + `AudioProcessingOptions.Analysis`); once a beta ships with it, delete `Sample/Platforms/{iOS,Android}/*AudioSource.cs` + `Features/Voice/Audio/{IAudioSource,PipeStream,NullAudioSource,AudioCaptureRegistration}.cs`, call `AddAudioServices()`, and reduce `VoiceRecorder` to permission + PCM16→float (the package already emits **16 kHz mono PCM16** via `AVAudioConverter`, so the hand-rolled resampler goes too). **Pass `AudioProcessingOptions.Analysis`** — the default still allows Bluetooth. Until then, the vendored path below is what ships: `Sample/Platforms/iOS/AppleAudioSource.cs` (`AVAudioEngine` tap) + `Sample/Platforms/Android/AndroidAudioSource.cs` (`AudioRecord`), both `public class … : IAudioSource` in namespace `Sample.Features.Voice.Audio` so `AddAudioCapture()` picks the right one per-TFM via `#if IOS/ANDROID` (a `NullAudioSource` stub covers MacCatalyst/Windows). **Format normalization is deliberate**: the shared `IAudioSource` contract yields **float32 mono** at the device's native rate (the vendored Apple source's `desiredFormat` was never applied — it taps at hardware rate), and **`VoiceRecorder` resamples to the 16 kHz** the embedder needs (Android is already 16 kHz → no-op; Apple ~48 kHz → linear resample). `VoiceRecorder.RecordAsync(TimeSpan)` is the single seam the pages use: it owns the **MAUI `Permissions.Microphone`** request, capture lifetime, and PCM→float→resample. Needs `NSMicrophoneUsageDescription` (iOS) + `RECORD_AUDIO` (Android), both added. Still needs a real ECAPA `.onnx` bundled at `Sample/Resources/Raw/ecapa.onnx` (gitignored, supplied per build, same as `arcface.onnx`); missing model surfaces as a "model missing" message on the voice pages, not a crash.
 
 ### Not yet built (voice)
 
