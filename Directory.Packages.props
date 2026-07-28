@@ -3,27 +3,26 @@
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     </PropertyGroup>
     <ItemGroup>
-        <!-- Versioning for the packages (version.json) - referenced by every project via Directory.Build.props -->
         <PackageVersion Include="Nerdbank.GitVersioning" Version="3.10.91"/>
         <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.1"/>
         <PackageVersion Include="SkiaSharp" Version="4.150.1"/>
         <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10"/>
-        <PackageVersion Include="Shiny.DocumentDb" Version="11.2.1"/>
-        <PackageVersion Include="Shiny.DocumentDb.Sqlite" Version="11.2.1"/>
-        <PackageVersion Include="Shiny.DocumentDb.Sqlite.VectorSupport" Version="11.2.1"/>
+        <PackageVersion Include="Shiny.DocumentDb" Version="12.3.0"/>
+        <PackageVersion Include="Shiny.DocumentDb.Sqlite" Version="12.3.0"/>
+        <PackageVersion Include="Shiny.DocumentDb.Sqlite.VectorSupport" Version="12.3.0"/>
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.2"/>
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.Text.Recognition" Version="119.0.1.7"/>
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.7"/>
     </ItemGroup>
     <ItemGroup>
-        <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.80"/>
+        <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.90"/>
         <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10"/>
         <PackageVersion Include="Shiny.Maui.Shell" Version="6.3.2"/>
         <PackageVersion Include="Shiny.Extensions.MauiHosting" Version="5.1.4"/>
         <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2"/>
-        <PackageVersion Include="Shiny.Maui.Controls" Version="1.0.1-beta-0146"/>
-        <PackageVersion Include="Shiny.Maui.Controls.Camera" Version="1.0.1-beta-0146"/>
-        <PackageVersion Include="Shiny.Maui.Controls.Camera.Face" Version="1.0.1-beta-0146"/>
+        <PackageVersion Include="Shiny.Maui.Controls" Version="1.0.1-beta-0148"/>
+        <PackageVersion Include="Shiny.Maui.Controls.Camera" Version="1.0.1-beta-0148"/>
+        <PackageVersion Include="Shiny.Maui.Controls.Camera.Face" Version="1.0.1-beta-0148"/>
         <PackageVersion Include="Microsoft.Maui.DevFlow.Agent" Version="0.1.0-preview.12.26358.3"/>
     </ItemGroup>
     <ItemGroup>
