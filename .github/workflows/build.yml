@@ -30,13 +30,13 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
           # Nerdbank.GitVersioning needs the full history to compute {height}
           fetch-depth: 0
 
     - name: Setup .NET 10.0
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
           dotnet-version: '10.0.x'
           # macos is required by Shiny.DocumentIntelligence's net10.0-macos (AppKit) target
@@ -46,7 +46,7 @@ jobs:
       run: dotnet build build.slnf /restore -m -property:Configuration=Release -property:PublicRelease=true
 
     - name: Publish Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: nugets
         path: ${{ github.workspace }}/artifacts
