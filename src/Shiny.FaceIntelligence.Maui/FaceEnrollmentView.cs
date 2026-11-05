@@ -43,10 +43,17 @@ public class FaceEnrollmentView : ContentView
     readonly Label instructionLabel;
     readonly Label hintLabel;
     readonly Label progressLabel;
+    readonly Border banner;
 
     readonly List<AnalyzedFace> captured = [];
     readonly List<float[]> capturedEmbeddings = [];
     readonly List<Person> people = [];
+    readonly List<FaceEnrollmentCapture> acceptedCaptures = [];
+    FaceEnrollmentRun? run;
+    FaceEnrollmentStep[] runSteps = [];
+    Task evaluationWork = Task.CompletedTask;
+    Task cameraWork = Task.CompletedTask;
+    int cameraGeneration;
 
     IFaceRecognitionAnalyzer? analyzer;
     IFaceEmbedder? embedder;
@@ -89,7 +96,7 @@ public class FaceEnrollmentView : ContentView
             HorizontalTextAlignment = TextAlignment.Center
         };
 
-        var banner = new Border
+        this.banner = new Border
         {
             BackgroundColor = Color.FromArgb("#CC000000"),
             StrokeShape = new RoundRectangle { CornerRadius = 14 },
@@ -110,7 +117,7 @@ public class FaceEnrollmentView : ContentView
             InputTransparent = true
         };
 
-        this.Content = new Grid { Children = { this.camera, this.guideOverlay, banner } };
+        this.Content = new Grid { Children = { this.camera, this.guideOverlay, this.banner } };
 
         this.camera.HandlerChanged += (_, _) => this.Start();
         this.Loaded += (_, _) =>
@@ -203,6 +210,22 @@ public class FaceEnrollmentView : ContentView
     /// <summary>Raised once every step is done and all shots have been enrolled.</summary>
     public event EventHandler<FaceEnrollmentResult>? Completed;
 
+    /// <summary>Raised only after a shot has actually been persisted, before the next step.</summary>
+    public event EventHandler<FaceEnrollmentCapture>? CaptureAccepted;
+
+    /// <summary>Disable new candidate acceptance without deleting or restarting the run.</summary>
+    public bool CaptureEnabled { get; set; } = true;
+
+    /// <summary>Time for caller-owned accepted-shot feedback before progressing. Zero retains prior behavior.</summary>
+    public TimeSpan AcceptedHoldDuration { get; set; }
+
+    /// <summary>Allows a caller-owned overlay; camera and quality/alignment gates remain inside this control.</summary>
+    public bool ShowBuiltInOverlay
+    {
+        get => this.guideOverlay.IsVisible;
+        set { this.guideOverlay.IsVisible = value; this.banner.IsVisible = value; }
+    }
+
     /// <summary>Raised when the camera can't be started, with the reason.</summary>
     public event EventHandler<string>? CameraFailed;
 
@@ -214,6 +237,8 @@ public class FaceEnrollmentView : ContentView
     /// </summary>
     public void BeginEnrollment()
     {
+        if (!this.evaluationWork.IsCompleted)
+            throw new InvalidOperationException("Await CancelEnrollmentAsync before starting a new run.");
         if (String.IsNullOrWhiteSpace(this.PersonIdentifier))
             throw new InvalidOperationException($"Set {nameof(this.PersonIdentifier)} before starting enrollment.");
         if (this.Steps.Count == 0)
@@ -222,6 +247,10 @@ public class FaceEnrollmentView : ContentView
         this.captured.Clear();
         this.capturedEmbeddings.Clear();
         this.people.Clear();
+        this.acceptedCaptures.Clear();
+        this.run?.Cancel();
+        this.run = new FaceEnrollmentRun(this.PersonIdentifier.Trim());
+        this.runSteps = this.Steps.ToArray();
         this.stepIndex = 0;
         this.running = true;
         this.BeginStep();
@@ -239,6 +268,13 @@ public class FaceEnrollmentView : ContentView
         this.guideOverlay.Invalidate();
         this.ReportProgress();
         this.hintLabel.Text = $"Get ready… {this.countdownRemaining}";
+
+        if (this.StepCountdown <= TimeSpan.Zero)
+        {
+            this.armed = true;
+            this.armedAt = DateTimeOffset.UtcNow;
+            return;
+        }
 
         this.countdownTimer ??= this.CreateCountdownTimer();
         this.countdownTimer.Stop();
@@ -271,7 +307,7 @@ public class FaceEnrollmentView : ContentView
     {
         this.stepIndex++;
         this.armed = false;
-        if (this.stepIndex >= this.Steps.Count)
+        if (this.stepIndex >= this.runSteps.Length)
             this.Finish();
         else
             this.BeginStep();
@@ -283,17 +319,41 @@ public class FaceEnrollmentView : ContentView
     /// </summary>
     public void CancelEnrollment()
     {
+        this.run?.Cancel();
         this.running = false;
         this.armed = false;
         this.countdownTimer?.Stop();
         this.guideDrawable.Guide = null;
         this.guideDrawable.Face = null;
         this.guideOverlay.Invalidate();
-        this.captured.Clear();
-        this.capturedEmbeddings.Clear();
         this.instructionLabel.Text = String.Empty;
         this.hintLabel.Text = String.Empty;
         this.progressLabel.Text = String.Empty;
+    }
+
+    /// <summary>Stop accepting frames and await all storage. Returned IDs include stores that
+    /// finished after cancellation. This method does not delete enrolled data.</summary>
+    public async Task<IReadOnlyList<FaceEnrollmentCapture>> CancelEnrollmentAsync()
+    {
+        var cancelledRun = this.run;
+        this.CancelEnrollment();
+        try { await this.evaluationWork; } catch { }
+        return cancelledRun is null ? [] : await cancelledRun.CancelAndDrainAsync();
+    }
+
+    /// <summary>True if storage may have written without returning an ID; scoped cleanup is unsafe.</summary>
+    public bool HasUncertainStorage => this.run?.HasUncertainStorage == true;
+
+    /// <summary>Reattach the preview after a page reappears. Does not begin or erase enrollment.</summary>
+    public void ResumePreview() { this.HookHostPage(); this.Start(); }
+
+    /// <summary>Stop the native preview and drain capture work before caller-owned deletion.</summary>
+    public async Task<IReadOnlyList<FaceEnrollmentCapture>> StopAsync()
+    {
+        this.Stop();
+        var captures = await this.CancelEnrollmentAsync();
+        await this.cameraWork;
+        return captures;
     }
 
     /// <summary>Subscribe to the containing page's Disappearing — the earliest reliable teardown signal.</summary>
@@ -318,13 +378,16 @@ public class FaceEnrollmentView : ContentView
     void Start()
     {
         this.EnsureAnalyzer();
-        _ = this.StartCameraAsync();
+        this.cameraWork = this.StartCameraAsync();
     }
 
     void EnsureAnalyzer()
     {
         if (this.analyzer is not null)
+        {
+            this.camera.Analyzer = this.analyzer;
             return;
+        }
 
         this.analyzer = this.Resolve<IFaceRecognitionAnalyzer>();
         this.embedder = this.Resolve<IFaceEmbedder>();
@@ -357,18 +420,26 @@ public class FaceEnrollmentView : ContentView
             return;
 
         this.started = true;
+        var generation = ++this.cameraGeneration;
         try
         {
-            if (!await this.camera.RequestPermissionAsync())
+            var permitted = await this.camera.RequestPermissionAsync();
+            if (generation != this.cameraGeneration || !this.started)
+                return;
+            if (!permitted)
             {
                 this.started = false;
                 this.CameraFailed?.Invoke(this, "Camera permission denied.");
                 return;
             }
             await this.camera.StartAsync();
+            if (generation != this.cameraGeneration || !this.started)
+                await this.StopCameraAsync();
         }
         catch (Exception ex)
         {
+            if (generation != this.cameraGeneration)
+                return;
             this.started = false;
             this.CameraFailed?.Invoke(this, $"Camera start failed ({ex.GetType().Name}): {ex.Message}");
         }
@@ -389,6 +460,8 @@ public class FaceEnrollmentView : ContentView
     /// </remarks>
     void Stop()
     {
+        this.cameraGeneration++;
+        this.run?.Cancel();
         if (this.hostPage is { } page)
         {
             page.Disappearing -= this.OnHostPageDisappearing;
@@ -406,7 +479,14 @@ public class FaceEnrollmentView : ContentView
 
         // Detach first: no analyzer means no new frames are queued while the session winds down.
         this.camera.Analyzer = null;
-        _ = this.StopCameraAsync();
+        var previousCameraWork = this.cameraWork;
+        this.cameraWork = this.DrainCameraAsync(previousCameraWork);
+    }
+
+    async Task DrainCameraAsync(Task previous)
+    {
+        try { await previous; } catch { }
+        await this.StopCameraAsync();
     }
 
     async Task StopCameraAsync()
@@ -423,14 +503,14 @@ public class FaceEnrollmentView : ContentView
 
     void OnFaceDetected(object? sender, AnalyzedFace face)
     {
-        if (!this.running || this.stepIndex >= this.Steps.Count)
+        if (!this.CaptureEnabled || !this.running || this.run is null || this.run.IsCancelled || this.stepIndex >= this.runSteps.Length)
         {
             this.guideDrawable.Face = null;
             this.guideOverlay.Invalidate();
             return;
         }
 
-        var currentStep = this.Steps[this.stepIndex];
+        var currentStep = this.runSteps[this.stepIndex];
         var guide = this.EffectiveGuide(currentStep, face.Aspect);
 
         // Repaint the guide every frame so the outline tracks the face and turns green on a fit — this runs
@@ -486,11 +566,12 @@ public class FaceEnrollmentView : ContentView
 
         // Everything past here decodes and embeds, so it runs off the UI thread, one at a time.
         this.evaluating = true;
-        _ = this.EvaluateAsync(face, step);
+        this.evaluationWork = this.EvaluateAsync(face, step, this.run, this.stepIndex);
     }
 
-    async Task EvaluateAsync(AnalyzedFace face, FaceEnrollmentStep step)
+    async Task EvaluateAsync(AnalyzedFace face, FaceEnrollmentStep step, FaceEnrollmentRun activeRun, int originalStep)
     {
+        var embeddings = this.capturedEmbeddings.ToArray();
         try
         {
             var verdict = await Task.Run(() =>
@@ -510,9 +591,9 @@ public class FaceEnrollmentView : ContentView
                 }
 
                 var embedding = this.embedder.Embed(face.ImageData, face.Box).ToArray();
-                if (step.RequireNovelty && this.capturedEmbeddings.Count > 0)
+                if (step.RequireNovelty && embeddings.Length > 0)
                 {
-                    var nearest = this.capturedEmbeddings.Min(e => Distance(e, embedding));
+                    var nearest = embeddings.Min(e => Distance(e, embedding));
                     Console.WriteLine($"[Enroll] step {this.stepIndex + 1}: sharp {sharpness:F1} bright {brightness:F2} nearest {nearest:F4} (need >= {this.MinNoveltyDistance:F2})");
                     if (nearest < this.MinNoveltyDistance)
                         return (FaceEnrollmentRejection.TooSimilar, null);
@@ -524,6 +605,9 @@ public class FaceEnrollmentView : ContentView
                 return (null, embedding);
             });
 
+            if (!ReferenceEquals(activeRun, this.run) || activeRun.IsCancelled || !this.CaptureEnabled)
+                return;
+
             if (verdict.Reason is { } reason)
             {
                 this.SetHint(reason);
@@ -531,39 +615,51 @@ public class FaceEnrollmentView : ContentView
             }
 
             Console.WriteLine($"[Enroll] ACCEPTED step {this.stepIndex + 1} ({this.captured.Count + 1} captured)");
-            this.captured.Add(face);
-            if (verdict.Embedding is { } vec)
-                this.capturedEmbeddings.Add(vec);
 
             // Store immediately rather than batching to the end. Deferring meant a single unsatisfiable step
             // threw away every shot already captured — the person stands there completing five prompts and
             // ends up with nothing enrolled. Incremental storage makes a partial session still useful.
-            if (!await this.StoreAsync(face))
+            if (!await this.StoreAsync(face, activeRun, originalStep))
+                return;
+
+            if (!ReferenceEquals(activeRun, this.run) || activeRun.IsCancelled)
+                return;
+            this.captured.Add(face);
+            if (verdict.Embedding is { } vec)
+                this.capturedEmbeddings.Add(vec);
+
+            this.CaptureAccepted?.Invoke(this, this.acceptedCaptures[^1]);
+            if (this.AcceptedHoldDuration > TimeSpan.Zero)
+                await Task.Delay(this.AcceptedHoldDuration, activeRun.CancellationToken);
+            if (!ReferenceEquals(activeRun, this.run) || activeRun.IsCancelled)
                 return;
 
             this.stepIndex++;
             this.armed = false;
 
-            if (this.stepIndex >= this.Steps.Count)
+            if (this.stepIndex >= this.runSteps.Length)
                 this.Finish();
             else
                 this.BeginStep();
         }
         catch (Exception ex)
         {
+            if (!ReferenceEquals(activeRun, this.run) || activeRun.IsCancelled)
+                return;
             this.running = false;
             this.CameraFailed?.Invoke(this, $"Enrollment failed ({ex.GetType().Name}): {ex.Message}");
         }
         finally
         {
-            this.evaluating = false;
+            if (ReferenceEquals(activeRun, this.run))
+                this.evaluating = false;
         }
     }
 
     /// <summary>Store one accepted shot straight away. Returns false (and reports) if it couldn't be stored.</summary>
-    async Task<bool> StoreAsync(AnalyzedFace shot)
+    async Task<bool> StoreAsync(AnalyzedFace shot, FaceEnrollmentRun activeRun, int originalStep)
     {
-        var id = this.PersonIdentifier?.Trim();
+        var id = activeRun.PersonIdentifier;
         if (String.IsNullOrWhiteSpace(id))
         {
             this.Fail("Nothing stored — PersonIdentifier is empty.");
@@ -582,12 +678,20 @@ public class FaceEnrollmentView : ContentView
         {
             // The box-based overload: no re-detection, and no duplicate gate — the sequence is explicitly one
             // person, so shots 2..n are *expected* to match shot 1.
-            this.people.Add(await store.Enroll(id, shot.ImageData, shot.Box));
+            Person? storedPerson = null;
+            var accepted = await activeRun.StoreAsync(originalStep, shot.ImageData, shot.ImageWidth, shot.ImageHeight,
+                async (identity, image, ct) => storedPerson = await store.Enroll(identity, image, shot.Box, ct));
+            if (!accepted || !ReferenceEquals(activeRun, this.run))
+                return false;
+            this.people.Add(storedPerson!);
+            this.acceptedCaptures.Add(activeRun.Captures[^1]);
             Console.WriteLine($"[Enroll] stored shot {this.people.Count} for '{id}'");
             return true;
         }
         catch (Exception ex)
         {
+            if (!ReferenceEquals(activeRun, this.run) || activeRun.IsCancelled)
+                return false;
             this.Fail($"Stored {this.people.Count} shot(s), then failed ({ex.GetType().Name}): {ex.Message}");
             return false;
         }
@@ -607,19 +711,23 @@ public class FaceEnrollmentView : ContentView
             for (var j = i + 1; j < this.capturedEmbeddings.Count; j++)
                 minPair = MathF.Min(minPair, Distance(this.capturedEmbeddings[i], this.capturedEmbeddings[j]));
 
-        var id = this.PersonIdentifier?.Trim() ?? String.Empty;
-        var skipped = this.Steps.Count - this.captured.Count;
+        var id = this.run?.PersonIdentifier ?? String.Empty;
+        var skipped = this.runSteps.Length - this.captured.Count;
         Console.WriteLine($"[Enroll] done: {this.people.Count} stored, {skipped} skipped, min pairwise {minPair:F3}");
 
         this.instructionLabel.Text = $"Enrolled {this.people.Count} shots for {id}";
         this.hintLabel.Text = skipped > 0 ? $"{skipped} step(s) skipped" : String.Empty;
         this.Completed?.Invoke(this, new FaceEnrollmentResult(
-            id, this.people.ToList(), this.capturedEmbeddings.Count > 1 ? minPair : 0f, skipped));
+            id, this.people.ToList(), this.capturedEmbeddings.Count > 1 ? minPair : 0f, skipped)
+        { Captures = this.acceptedCaptures.ToArray() });
     }
 
     /// <summary>Surface a failure rather than ending the sequence quietly with nothing saved.</summary>
     void Fail(string message)
     {
+        this.running = false;
+        this.armed = false;
+        this.countdownTimer?.Stop();
         Console.WriteLine($"[Enroll] {message}");
         this.instructionLabel.Text = "Enrollment failed";
         this.hintLabel.Text = message;
@@ -628,13 +736,13 @@ public class FaceEnrollmentView : ContentView
 
     void ReportProgress()
     {
-        if (this.stepIndex < this.Steps.Count)
+        if (this.stepIndex < this.runSteps.Length)
         {
-            var step = this.Steps[this.stepIndex];
+            var step = this.runSteps[this.stepIndex];
             this.instructionLabel.Text = step.Instruction;
-            this.progressLabel.Text = $"Step {this.stepIndex + 1} of {this.Steps.Count} · {this.captured.Count} captured";
+            this.progressLabel.Text = $"Step {this.stepIndex + 1} of {this.runSteps.Length} · {this.captured.Count} captured";
             this.Progress?.Invoke(this, new FaceEnrollmentProgress(
-                this.stepIndex, this.Steps.Count, step.Instruction, this.captured.Count));
+                this.stepIndex, this.runSteps.Length, step.Instruction, this.captured.Count));
         }
         else
         {
