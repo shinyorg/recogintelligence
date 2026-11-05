@@ -29,6 +29,9 @@
         <Compile Include="../../src/Shiny.FaceIntelligence.Maui/AnalyzedFace.cs" Link="Camera/AnalyzedFace.cs" />
         <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FrameQuality.cs" Link="Camera/FrameQuality.cs" />
         <Compile Include="../../src/Shiny.FaceIntelligence.Maui/Internals/FrameImageConverter.cs" Link="Camera/FrameImageConverter.cs" />
+        <!-- These pure geometry sources have no controls/platform dependencies. -->
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceGuide.cs" Link="Geometry/FaceGuide.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/Internals/FaceGuideDrawable.cs" Link="Geometry/FaceGuideDrawable.cs" />
     </ItemGroup>
 
     <ItemGroup>

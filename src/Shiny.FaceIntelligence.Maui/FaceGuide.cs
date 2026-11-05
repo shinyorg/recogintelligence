@@ -38,6 +38,9 @@ public record FaceGuide(
     /// </summary>
     public const float AspectRatio = 0.78f;
 
+    /// <summary>Oval width / height in preview pixels. Existing callers retain the original ratio.</summary>
+    public float OvalAspectRatio { get; init; } = AspectRatio;
+
     /// <summary>
     /// Re-express this guide, whose coordinates are fractions of the <b>visible</b> preview, as fractions of
     /// the full frame — the space detections arrive in.

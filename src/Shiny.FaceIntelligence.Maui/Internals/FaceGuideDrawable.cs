@@ -76,7 +76,7 @@ sealed class FaceGuideDrawable : IDrawable
     {
         var probe = ToView(new RectF(guide.CenterX, guide.CenterY, 0f, guide.Height), view, imageAspect);
         var h = probe.Height;
-        var w = h * FaceGuide.AspectRatio;
+        var w = h * guide.OvalAspectRatio;
         return new RectF(probe.X - (w / 2f), probe.Y - (h / 2f), w, h);
     }
 

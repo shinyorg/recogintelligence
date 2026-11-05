@@ -5,6 +5,7 @@
     <ItemGroup>
         <!-- Versioning for the packages (version.json) - referenced by every project via Directory.Build.props -->
         <PackageVersion Include="Nerdbank.GitVersioning" Version="3.10.91"/>
+        <PackageVersion Include="Microsoft.Maui.Graphics" Version="10.0.110"/>
         <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.1"/>
         <PackageVersion Include="SkiaSharp" Version="4.150.1"/>
         <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10"/>
