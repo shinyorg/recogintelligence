@@ -88,7 +88,7 @@ maui devflow ui tree --platform ios --depth 2
 maui devflow logs --platform ios
 ```
 
-Notes: the tunnel (`iproxy`) must stay up for the whole session — relaunching the app or unplugging the phone drops it, just restart iproxy. `maui devflow list` stays `[]` (that's broker auto-discovery, which isn't used on this path); rely on `agent status --platform ios` instead. The **Android head does not build** (ORT/MAUI pin violations, see `Directory.Packages.props`), so device debugging is iOS-only for now.
+Notes: the tunnel (`iproxy`) must stay up for the whole session — relaunching the app or unplugging the phone drops it, just restart iproxy. `maui devflow list` stays `[]` (that's broker auto-discovery, which isn't used on this path); rely on `agent status --platform ios` instead. Windows and Android sample builds are supported with the centralized dependency versions in `Directory.Packages.props`. Building a target does not establish physical camera, microphone or device-runtime behavior.
 
 ## Tests & benchmarks
 
