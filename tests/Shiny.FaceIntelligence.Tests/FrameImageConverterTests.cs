@@ -19,14 +19,3 @@ namespace Shiny.FaceIntelligence.Tests
         }
     }
 }
-
-// The linked production file's native entry point is not under test here. Only its shared
-// bitmap operations run; Android YUV conversion still requires the platform verification.
-namespace Shiny.Controls.Camera { public sealed class CameraFrame; }
-namespace Shiny.FaceIntelligence.Maui
-{
-    sealed partial class FrameImageConverter
-    {
-        public partial SKBitmap? ToUpright(Shiny.Controls.Camera.CameraFrame frame, int maxWidth) => null;
-    }
-}
