@@ -38,6 +38,12 @@ public enum FaceEnrollmentRejection
 /// <param name="CapturedCount">How many shots have been accepted so far.</param>
 public record FaceEnrollmentProgress(int StepIndex, int StepCount, string Instruction, int CapturedCount);
 
+/// <summary>Countdown remaining before quality-gated capture may begin; zero means Shiny is waiting for a suitable frame.</summary>
+public record FaceEnrollmentCountdown(int StepIndex, int SecondsRemaining);
+
+/// <summary>Live geometric guide feedback, independent of the caller's instructions.</summary>
+public record FaceGuideFeedback(bool? IsAligned, string? Hint);
+
 /// <summary>A candidate frame was rejected; <paramref name="Hint"/> is a ready-to-show explanation.</summary>
 /// <param name="Reason">Why it was rejected.</param>
 /// <param name="Hint">Human-readable guidance, e.g. "Turn a little further — that looked like the last shot".</param>

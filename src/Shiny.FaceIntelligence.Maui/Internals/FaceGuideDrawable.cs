@@ -26,6 +26,8 @@ sealed class FaceGuideDrawable : IDrawable
 
     /// <summary>True when the face currently satisfies the guide — flips the outline to green.</summary>
     public bool IsAligned { get; set; }
+    /// <summary>Optional animated transition from unaligned (0) to aligned (1).</summary>
+    public float? AlignmentProgress { get; set; }
 
     /// <summary>Dim applied outside the oval.</summary>
     public Color ScrimColor { get; set; } = Color.FromRgba(0, 0, 0, 0.55f);
@@ -52,9 +54,13 @@ sealed class FaceGuideDrawable : IDrawable
         canvas.FillRectangle(dirtyRect);
         canvas.RestoreState();
 
-        canvas.StrokeColor = this.IsAligned ? this.AlignedColor : this.UnalignedColor;
-        canvas.StrokeSize = this.IsAligned ? 5f : 3f;
-        canvas.StrokeDashPattern = this.IsAligned ? null : [10f, 6f];
+        var progress = Math.Clamp(this.AlignmentProgress ?? (this.IsAligned ? 1f : 0f), 0f, 1f);
+        canvas.StrokeColor = new Color(
+            this.UnalignedColor.Red + (this.AlignedColor.Red - this.UnalignedColor.Red) * progress,
+            this.UnalignedColor.Green + (this.AlignedColor.Green - this.UnalignedColor.Green) * progress,
+            this.UnalignedColor.Blue + (this.AlignedColor.Blue - this.UnalignedColor.Blue) * progress);
+        canvas.StrokeSize = 3f + 2f * progress;
+        canvas.StrokeDashPattern = progress >= 1f ? null : [10f, 6f];
         canvas.DrawEllipse(oval);
         canvas.StrokeDashPattern = null;
 
