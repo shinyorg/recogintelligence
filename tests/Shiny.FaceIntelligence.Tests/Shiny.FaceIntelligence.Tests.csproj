@@ -27,8 +27,8 @@
         <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceRecognitionAnalyzer.cs" Link="Camera/FaceRecognitionAnalyzer.cs" />
         <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceRecognizedEventArgs.cs" Link="Camera/FaceRecognizedEventArgs.cs" />
         <Compile Include="../../src/Shiny.FaceIntelligence.Maui/AnalyzedFace.cs" Link="Camera/AnalyzedFace.cs" />
-        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FrameQuality.cs" Link="Camera/FrameQuality.cs" />
-        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/Internals/FrameImageConverter.cs" Link="Camera/FrameImageConverter.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/Internals/FrameQuality.cs" Link="Camera/FrameQuality.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/Internals/FrameImageConverter.cs" Link="Imaging/FrameImageConverter.cs" />
     </ItemGroup>
 
     <ItemGroup>
