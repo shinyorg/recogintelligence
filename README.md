@@ -66,6 +66,25 @@ BenchmarkDotNet v0.15.8 · Apple M5 Pro · .NET 10.0.8 (Arm64) · macOS 26.5
 
 Brute-force exact search scales roughly linearly with gallery size (`VectorIndexKind.None`); ~4.8 ms at 10k enrolled shots is comfortable for on-device use. Managed allocations are constant (the result set), independent of gallery size. For much larger galleries, switch to an ANN index.
 
+## Windows development
+
+On a Windows host, the face and voice MAUI controls also target
+`net10.0-windows10.0.19041.0` (minimum Windows version 10.0.17763.0). The face
+camera adapter consumes the managed BGRA8 buffer from `WindowsCameraFrame` and
+applies the same upright orientation and maximum-width policy as the other platforms.
+
+Build the sample with:
+
+```powershell
+dotnet build Sample/Sample.csproj -f net10.0-windows10.0.19041.0
+```
+
+The centralized MAUI Controls version is referenced explicitly by the face library,
+so it is aligned with the camera dependency. DocumentDb 14 uses the model builder to
+configure the cosine-vector properties for both face and voice stores.
+Models and the appropriate sqlite-vec native binary are still required for runtime
+recognition. A successful build does not verify a physical Windows camera or the Apple targets.
+
 ## Development
 
 Architecture, build/pack details, the ONNX Runtime iOS linker fix, tuning, and the open TODOs (identity hardening, coordinate space, landmark alignment) are documented in **[CLAUDE.md](CLAUDE.md)** — the canonical reference for working in this repo.

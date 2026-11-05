@@ -6,17 +6,22 @@
              de-mirrored before any ONNX model sees it. No bare net10.0 target — there are no camera frames
              off-device, and the analyzer would have nothing to implement. -->
         <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
         <UseMaui>true</UseMaui>
         <Description>Live face recognition as a Shiny CameraView frame analyzer: detects faces on every frame and runs Shiny.FaceIntelligence recognition when a face holds steady — no still capture required.</Description>
 
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="../Shiny.FaceIntelligence/Shiny.FaceIntelligence.csproj" />
         <PackageReference Include="Shiny.Maui.Controls.Camera" />
+        <!-- Explicit so CPM pins the version. Without it UseMaui adds an implicit, older Microsoft.Maui.Controls, and the Windows app
+        head then merges two copies of Microsoft.Maui.pri (PRI277 duplicate Resources.xbf). -->
+        <PackageReference Include="Microsoft.Maui.Controls" />
     </ItemGroup>
 
     <!-- Per-platform frame conversion. Everything under Platforms/ is opted out, then back in by TFM. -->
@@ -28,6 +33,9 @@
     </ItemGroup>
     <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'android'">
         <Compile Include="Platforms/Android/**/*.cs" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'windows'">
+        <Compile Include="Platforms/Windows/**/*.cs" />
     </ItemGroup>
 
 </Project>
