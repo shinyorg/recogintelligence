@@ -15,4 +15,7 @@ namespace Shiny.FaceIntelligence.Maui;
 /// <see cref="Shiny.Controls.Camera.OverlayBox"/> uses, so it maps directly onto the preview.
 /// </param>
 /// <param name="Confidence">The detector's confidence that this region was a face, 0..1.</param>
-public record FaceRecognizedEventArgs(RecognitionResult Result, RectF Bounds, float Confidence);
+public record FaceRecognizedEventArgs(RecognitionResult Result, RectF Bounds, float Confidence)
+{
+    public FaceFrameStamp? Stamp { get; init; }
+}

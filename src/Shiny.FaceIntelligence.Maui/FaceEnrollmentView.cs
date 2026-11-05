@@ -48,7 +48,7 @@ public class FaceEnrollmentView : ContentView
     readonly List<float[]> capturedEmbeddings = [];
     readonly List<Person> people = [];
 
-    FaceRecognitionAnalyzer? analyzer;
+    IFaceRecognitionAnalyzer? analyzer;
     IFaceEmbedder? embedder;
     IFaceIntelligence? intelligence;
     bool started;
@@ -326,7 +326,7 @@ public class FaceEnrollmentView : ContentView
         if (this.analyzer is not null)
             return;
 
-        this.analyzer = this.Resolve<FaceRecognitionAnalyzer>();
+        this.analyzer = this.Resolve<IFaceRecognitionAnalyzer>();
         this.embedder = this.Resolve<IFaceEmbedder>();
         this.intelligence = this.Resolve<IFaceIntelligence>();
         if (this.analyzer is null)
@@ -347,7 +347,7 @@ public class FaceEnrollmentView : ContentView
             this.guideOverlay.Invalidate();
             this.SetHint(FaceEnrollmentRejection.NoFace);
         };
-        this.camera.Analyzer = this.analyzer;
+        this.camera.Analyzer = this.analyzer.NativeAnalyzer;
     }
 
     async Task StartCameraAsync()

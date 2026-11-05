@@ -35,7 +35,7 @@ public class FaceModule : IMauiModule
 
         // The live-recognition frame analyzer (Shiny.FaceIntelligence.Maui). Transient: it carries per-camera
         // state (stability counter, last result), so each page that hosts one gets its own.
-        builder.Services.AddTransient<FaceRecognitionAnalyzer>();
+        builder.Services.AddTransient<IFaceRecognitionAnalyzer, FaceRecognitionAnalyzer>();
     }
 
     public void Use(IPlatformApplication app) { }

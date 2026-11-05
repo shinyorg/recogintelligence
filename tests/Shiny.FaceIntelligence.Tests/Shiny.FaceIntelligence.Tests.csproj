@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft.Maui.Graphics" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="xunit.v3" />
         <PackageReference Include="xunit.runner.visualstudio" />
@@ -18,6 +19,16 @@
         <ProjectReference Include="..\..\src\Shiny.FaceIntelligence\Shiny.FaceIntelligence.csproj" />
         <ProjectReference Include="..\..\src\Shiny.FaceIntelligence.DocumentDb.Sqlite\Shiny.FaceIntelligence.DocumentDb.Sqlite.csproj" />
         <ProjectReference Include="..\Shiny.FaceIntelligence.TestKit\Shiny.FaceIntelligence.TestKit.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Exercise the actual analyzer with only native camera/UI dispatch stubbed. -->
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceFrameObservation.cs" Link="Camera/FaceFrameObservation.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceRecognitionAnalyzer.cs" Link="Camera/FaceRecognitionAnalyzer.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceRecognizedEventArgs.cs" Link="Camera/FaceRecognizedEventArgs.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/AnalyzedFace.cs" Link="Camera/AnalyzedFace.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FrameQuality.cs" Link="Camera/FrameQuality.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/Internals/FrameImageConverter.cs" Link="Camera/FrameImageConverter.cs" />
     </ItemGroup>
 
     <ItemGroup>

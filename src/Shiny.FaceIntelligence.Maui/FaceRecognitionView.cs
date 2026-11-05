@@ -33,8 +33,10 @@ namespace Shiny.FaceIntelligence.Maui;
 public class FaceRecognitionView : ContentView
 {
     readonly CameraView camera;
-    FaceRecognitionAnalyzer? analyzer;
+    IFaceRecognitionAnalyzer? analyzer;
     bool started;
+    long lifecycle;
+    Task stopWork = Task.CompletedTask;
     Page? hostPage;
 
     public FaceRecognitionView()
@@ -65,6 +67,14 @@ public class FaceRecognitionView : ContentView
 
     /// <summary>Raised on the UI thread for every recognition attempt, including a no-match.</summary>
     public event EventHandler<FaceRecognizedEventArgs>? FaceRecognized;
+    public event EventHandler<FaceFrameObservation>? FrameObserved;
+    public event EventHandler? AnalyzerReady;
+    public static readonly BindableProperty IsActiveProperty = BindableProperty.Create(
+        nameof(IsActive), typeof(bool), typeof(FaceRecognitionView), true,
+        propertyChanged: (b, _, value) => { if ((bool)value) ((FaceRecognitionView)b).Start(); else ((FaceRecognitionView)b).Stop(); });
+    public bool IsActive { get => (bool)GetValue(IsActiveProperty); set => SetValue(IsActiveProperty, value); }
+    public Task<bool> DrainAsync(TimeSpan timeout) => analyzer?.StopSessionAsync(timeout) ?? Task.FromResult(true);
+
 
     /// <summary>Raised when the camera can't be started (permission refused, hardware error) with the reason.</summary>
     public event EventHandler<string>? CameraFailed;
@@ -109,7 +119,7 @@ public class FaceRecognitionView : ContentView
     /// The underlying analyzer once the control has resolved it, for tuning (<c>StabilityFrames</c>,
     /// <c>RecognitionInterval</c>, <c>MinConfidence</c>, box colors). <c>null</c> before the handler connects.
     /// </summary>
-    public FaceRecognitionAnalyzer? Analyzer => this.analyzer;
+    public IFaceRecognitionAnalyzer? Analyzer => this.analyzer;
 
     /// <summary>
     /// Enroll the face the analyzer is currently looking at, under <paramref name="personIdentifier"/>. Returns the
@@ -157,6 +167,7 @@ public class FaceRecognitionView : ContentView
 
     void Start()
     {
+        if (!IsActive) return;
         this.EnsureAnalyzer();
         _ = this.StartCameraAsync();
     }
@@ -164,15 +175,20 @@ public class FaceRecognitionView : ContentView
     void EnsureAnalyzer()
     {
         if (this.analyzer is not null)
+        {
+            this.camera.Analyzer = this.analyzer.NativeAnalyzer;
             return;
+        }
 
-        this.analyzer = this.Resolve<FaceRecognitionAnalyzer>();
+        this.analyzer = this.Resolve<IFaceRecognitionAnalyzer>();
         if (this.analyzer is null)
             return;
 
         this.analyzer.RecognitionEnabled = this.RecognitionEnabled;
         this.analyzer.FaceRecognized += (s, e) => this.FaceRecognized?.Invoke(this, e);
-        this.camera.Analyzer = this.analyzer;
+        this.analyzer.FrameObserved += (s, e) => this.FrameObserved?.Invoke(this, e);
+        this.camera.Analyzer = this.analyzer.NativeAnalyzer;
+        AnalyzerReady?.Invoke(this, EventArgs.Empty);
     }
 
     async Task StartCameraAsync()
@@ -182,15 +198,22 @@ public class FaceRecognitionView : ContentView
             return;
 
         this.started = true;
+        var generation = ++lifecycle;
         try
         {
+            await stopWork;
+            if (generation != lifecycle || !IsActive || camera.Handler is null) return;
+            analyzer?.BeginSession();
+            this.camera.Analyzer = analyzer?.NativeAnalyzer;
             if (!await this.camera.RequestPermissionAsync())
             {
                 this.started = false;
                 this.CameraFailed?.Invoke(this, "Camera permission denied.");
                 return;
             }
+            if (generation != lifecycle || !IsActive) return;
             await this.camera.StartAsync();
+            if (generation != lifecycle || !IsActive) await this.camera.StopAsync();
         }
         catch (Exception ex)
         {
@@ -223,10 +246,12 @@ public class FaceRecognitionView : ContentView
         if (!this.started)
             return;
         this.started = false;
+        lifecycle++;
+        _ = analyzer?.StopSessionAsync(TimeSpan.FromSeconds(1));
 
         // Detach first: no analyzer means no new frames are queued while the session winds down.
         this.camera.Analyzer = null;
-        _ = this.StopCameraAsync();
+        stopWork = this.StopCameraAsync();
     }
 
     async Task StopCameraAsync()
