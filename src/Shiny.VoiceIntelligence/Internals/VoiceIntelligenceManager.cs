@@ -66,4 +66,13 @@ public class VoiceIntelligenceManager(
     public Task<IReadOnlyList<Speaker>> GetAll(CancellationToken ct = default) => store.GetAll(ct);
 
     public Task<int> Forget(string personIdentifier, CancellationToken ct = default) => store.RemoveByPersonIdentifier(personIdentifier, ct);
+
+    public Task<int> ForgetShots(string personIdentifier, IReadOnlyCollection<string> shotIds, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(personIdentifier);
+        ArgumentNullException.ThrowIfNull(shotIds);
+        if (shotIds.Any(String.IsNullOrWhiteSpace))
+            throw new ArgumentException("Shot ids cannot be blank.", nameof(shotIds));
+        return shotIds.Count == 0 ? Task.FromResult(0) : store.RemoveShots(personIdentifier, shotIds, ct);
+    }
 }

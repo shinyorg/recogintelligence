@@ -23,9 +23,13 @@ public interface IFaceStore
     /// <summary>Delete every enrolled shot for a given identity. Returns the number removed.</summary>
     Task<int> RemoveByPersonIdentifier(string personIdentifier, CancellationToken ct = default);
 
-    /// <summary>Delete selected documents only when they belong to the supplied identity.</summary>
-    Task<int> RemoveShots(string personIdentifier, IReadOnlyCollection<string> personIds, CancellationToken ct = default)
-        => throw new NotSupportedException("This face store does not support scoped enrollment cleanup.");
+    /// <summary>
+    /// Delete the given shots (<see cref="Person.Id"/> document ids) — but only those that belong to
+    /// <paramref name="personIdentifier"/>; ids of other identities are ignored. Returns the number removed.
+    /// </summary>
+    /// <remarks>Default implementation throws so existing third-party stores stay source compatible.</remarks>
+    Task<int> RemoveShots(string personIdentifier, IReadOnlyCollection<string> shotIds, CancellationToken ct = default)
+        => throw new NotSupportedException($"{this.GetType().Name} does not implement {nameof(RemoveShots)}.");
 }
 
 /// <summary>A nearest-neighbor hit: an enrolled <see cref="Person"/> and its distance to the query.</summary>

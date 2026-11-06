@@ -49,7 +49,12 @@ public interface IFaceIntelligence
     /// <summary>Delete every enrolled shot for a given identity. Returns the number removed.</summary>
     Task<int> Forget(string personIdentifier, CancellationToken ct = default);
 
-    /// <summary>Delete only selected shot IDs belonging to this identity, preserving other runs.</summary>
-    Task<int> ForgetShots(string personIdentifier, IReadOnlyCollection<string> personIds, CancellationToken ct = default)
-        => throw new NotSupportedException("This face store does not support scoped enrollment cleanup.");
+    /// <summary>
+    /// Delete only the given shots — the <see cref="Person.Id"/> document ids returned by <c>Enroll</c> (or
+    /// <c>FaceEnrollmentResult.Captures</c>) — and only where they belong to <paramref name="personIdentifier"/>.
+    /// Other shots of the same identity, and every other identity, are left alone, so one enrollment run can be
+    /// undone without <see cref="Forget"/>ting the person. Returns the number removed.
+    /// </summary>
+    Task<int> ForgetShots(string personIdentifier, IReadOnlyCollection<string> shotIds, CancellationToken ct = default)
+        => throw new NotSupportedException($"{this.GetType().Name} does not implement {nameof(ForgetShots)}.");
 }

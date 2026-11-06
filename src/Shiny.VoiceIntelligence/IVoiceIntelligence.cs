@@ -43,4 +43,12 @@ public interface IVoiceIntelligence
 
     /// <summary>Delete every enrolled utterance for a given identity. Returns the number removed.</summary>
     Task<int> Forget(string personIdentifier, CancellationToken ct = default);
+
+    /// <summary>
+    /// Delete only the given utterances — the <see cref="Speaker.Id"/> document ids returned by <c>Enroll</c> —
+    /// and only where they belong to <paramref name="personIdentifier"/>, leaving the identity's other
+    /// voiceprints and every other identity alone. Returns the number removed.
+    /// </summary>
+    Task<int> ForgetShots(string personIdentifier, IReadOnlyCollection<string> shotIds, CancellationToken ct = default)
+        => throw new NotSupportedException($"{this.GetType().Name} does not implement {nameof(ForgetShots)}.");
 }

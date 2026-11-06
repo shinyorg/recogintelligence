@@ -162,6 +162,23 @@ public class VoiceIntelligenceManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task ForgetShots_RemovesOnlyTheGivenUtterancesOfThatIdentity()
+    {
+        RequireVec0();
+        var rec = this.Create();
+        var kept = await rec.Enroll("Allan", TestVoices.Utterance(1, 0, 0, 0, 0, 0, 0, 0));
+        var dropped = await rec.Enroll("Allan", TestVoices.Utterance(0, 1, 0, 0, 0, 0, 0, 0));
+        var bob = await rec.Enroll("Bob", TestVoices.Utterance(0, 0, 1, 0, 0, 0, 0, 0));
+
+        // Duplicate ids count once; Bob's id is ignored because it isn't Allan's.
+        Assert.Equal(1, await rec.ForgetShots("Allan", [dropped.Id, dropped.Id, bob.Id]));
+        Assert.Equal(new[] { kept.Id, bob.Id }.Order(), (await rec.GetAll()).Select(s => s.Id).Order());
+        Assert.False((await rec.Recognize(TestVoices.Utterance(0, 1, 0, 0, 0, 0, 0, 0))).IsMatch);
+        Assert.Equal("Allan", (await rec.Recognize(TestVoices.Utterance(1, 0, 0, 0, 0, 0, 0, 0))).PersonIdentifier);
+        Assert.Equal(0, await rec.ForgetShots("Allan", []));
+    }
+
+    [Fact]
     public async Task GetAll_ReturnsOnePerUtterance()
     {
         RequireVec0();

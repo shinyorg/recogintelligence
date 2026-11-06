@@ -78,6 +78,9 @@ public class FaceIntelligenceManagerTests : IDisposable
         Assert.Equal(1, await rec.ForgetShots("7", [removed.Id, removed.Id, other.Id]));
         Assert.Equal(new[] { kept.Id, other.Id }.Order(), (await rec.GetAll()).Select(p => p.Id).Order());
         Assert.False((await rec.Recognize(TestFaces.Image(0, 1, 0, 0, 0, 0, 0, 0), AnyBox)).IsMatch);
+        // The surviving shot still recognizes, and an empty selection is a no-op.
+        Assert.Equal(kept.Id, (await rec.Recognize(TestFaces.Image(1, 0, 0, 0, 0, 0, 0, 0), AnyBox)).DocumentId);
+        Assert.Equal(0, await rec.ForgetShots("7", []));
     }
 
     [Fact]

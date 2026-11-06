@@ -33,4 +33,13 @@ public class DocumentDbVoiceStore(IDocumentStore store) : IVoiceStore
 
     public Task<int> RemoveByPersonIdentifier(string personIdentifier, CancellationToken ct = default)
         => store.Query<Speaker>().Where(s => s.PersonIdentifier == personIdentifier).ExecuteDelete(ct);
+
+    // One statement (`Id IN (...)`), so a partial failure can't leave half a run deleted.
+    public Task<int> RemoveShots(string personIdentifier, IReadOnlyCollection<string> shotIds, CancellationToken ct = default)
+    {
+        var ids = shotIds.Distinct(StringComparer.Ordinal).ToArray();
+        return store.Query<Speaker>()
+            .Where(s => s.PersonIdentifier == personIdentifier && ids.Contains(s.Id))
+            .ExecuteDelete(ct);
+    }
 }

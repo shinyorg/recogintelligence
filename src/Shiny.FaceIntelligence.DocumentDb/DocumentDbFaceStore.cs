@@ -34,12 +34,12 @@ public class DocumentDbFaceStore(IDocumentStore store) : IFaceStore
     public Task<int> RemoveByPersonIdentifier(string personIdentifier, CancellationToken ct = default)
         => store.Query<Person>().Where(p => p.PersonIdentifier == personIdentifier).ExecuteDelete(ct);
 
-    public async Task<int> RemoveShots(string personIdentifier, IReadOnlyCollection<string> personIds, CancellationToken ct = default)
+    // One statement (`Id IN (...)`), so a partial failure can't leave half a run deleted.
+    public Task<int> RemoveShots(string personIdentifier, IReadOnlyCollection<string> shotIds, CancellationToken ct = default)
     {
-        var removed = 0;
-        foreach (var id in personIds.Distinct(StringComparer.Ordinal))
-            removed += await store.Query<Person>()
-                .Where(p => p.PersonIdentifier == personIdentifier && p.Id == id).ExecuteDelete(ct);
-        return removed;
+        var ids = shotIds.Distinct(StringComparer.Ordinal).ToArray();
+        return store.Query<Person>()
+            .Where(p => p.PersonIdentifier == personIdentifier && ids.Contains(p.Id))
+            .ExecuteDelete(ct);
     }
 }

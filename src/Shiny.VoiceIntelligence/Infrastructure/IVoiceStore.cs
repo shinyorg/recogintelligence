@@ -22,6 +22,15 @@ public interface IVoiceStore
 
     /// <summary>Delete every enrolled utterance for a given identity. Returns the number removed.</summary>
     Task<int> RemoveByPersonIdentifier(string personIdentifier, CancellationToken ct = default);
+
+    /// <summary>
+    /// Delete the given utterances (<see cref="Speaker.Id"/> document ids) — but only those that belong to
+    /// <paramref name="personIdentifier"/>; ids of other identities are ignored. Returns the number removed.
+    /// Mirrors face's <c>IFaceStore.RemoveShots</c>.
+    /// </summary>
+    /// <remarks>Default implementation throws so existing third-party stores stay source compatible.</remarks>
+    Task<int> RemoveShots(string personIdentifier, IReadOnlyCollection<string> shotIds, CancellationToken ct = default)
+        => throw new NotSupportedException($"{this.GetType().Name} does not implement {nameof(RemoveShots)}.");
 }
 
 /// <summary>A nearest-neighbor hit: an enrolled <see cref="Speaker"/> and its distance to the query.</summary>
