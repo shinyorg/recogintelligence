@@ -30,7 +30,7 @@ public static class DocumentDbStoreRegistration
                 UseReflectionFallback = false
             };
             // Vector dimension must match the model's output (read from the embedder).
-            options.MapVectorProperty<Person>(p => p.Embedding, embedder.Dimensions, VectorDistance.Cosine);
+            options.ConfigureDocument<Person>(cfg => cfg.MapVectorProperty(p => p.Embedding, embedder.Dimensions, VectorDistance.Cosine));
 
             // Build eagerly — cheap. new DocumentStore only creates the connection object + mapping
             // metadata; the DB connection + vec0 load are deferred by DocumentStore to the first

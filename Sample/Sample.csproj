@@ -73,4 +73,11 @@
         <PackageReference Include="Microsoft.Maui.DevFlow.Agent"/>
     </ItemGroup>
 
+    <ItemGroup Condition="'$(TargetPlatformIdentifier)' == 'android'">
+        <!-- AndroidX Fragment 1.9 folded fragment-ktx into fragment; a transitive Fragment.Ktx 1.8.x still
+             ships its own FragmentKt and D8 fails with "Type androidx.fragment.app.FragmentKt is defined
+             multiple times". Lifting Ktx to 1.9.x (an empty shim) removes the duplicate. -->
+        <PackageReference Include="Xamarin.AndroidX.Fragment.Ktx"/>
+    </ItemGroup>
+
 </Project>

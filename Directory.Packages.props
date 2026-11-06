@@ -4,33 +4,34 @@
     </PropertyGroup>
     <ItemGroup>
         <!-- Versioning for the packages (version.json) - referenced by every project via Directory.Build.props -->
-        <PackageVersion Include="Nerdbank.GitVersioning" Version="3.10.91"/>
-        <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.1"/>
-        <PackageVersion Include="SkiaSharp" Version="4.150.1"/>
-        <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10"/>
-        <PackageVersion Include="Shiny.DocumentDb" Version="12.3.0"/>
-        <PackageVersion Include="Shiny.DocumentDb.Sqlite" Version="12.3.0"/>
-        <PackageVersion Include="Shiny.DocumentDb.Sqlite.VectorSupport" Version="12.3.0"/>
-        <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.2"/>
-        <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.Text.Recognition" Version="119.0.1.7"/>
-        <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.7"/>
+        <PackageVersion Include="Nerdbank.GitVersioning" Version="3.10.94"/>
+        <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.31.1"/>
+        <PackageVersion Include="SkiaSharp" Version="4.154.0"/>
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14"/>
+        <PackageVersion Include="Shiny.DocumentDb" Version="14.1.0"/>
+        <PackageVersion Include="Shiny.DocumentDb.Sqlite" Version="14.1.0"/>
+        <PackageVersion Include="Shiny.DocumentDb.Sqlite.VectorSupport" Version="14.1.0"/>
+        <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.4"/>
+        <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.Text.Recognition" Version="119.0.1.9"/>
+        <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.9"/>
     </ItemGroup>
     <ItemGroup>
-        <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.90"/>
-        <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10"/>
-        <PackageVersion Include="Shiny.Maui.Shell" Version="6.3.2"/>
-        <PackageVersion Include="Shiny.Extensions.MauiHosting" Version="5.1.4"/>
+        <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.120"/>
+        <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.14"/>
+        <PackageVersion Include="Shiny.Maui.Shell" Version="7.0.3"/>
+        <PackageVersion Include="Shiny.Extensions.MauiHosting" Version="5.3.1"/>
         <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2"/>
-        <PackageVersion Include="Shiny.Maui.Controls" Version="1.0.1-beta-0148"/>
-        <PackageVersion Include="Shiny.Maui.Controls.Camera" Version="1.0.1-beta-0148"/>
-        <PackageVersion Include="Shiny.Maui.Controls.Camera.Face" Version="1.0.1-beta-0148"/>
-        <PackageVersion Include="Microsoft.Maui.DevFlow.Agent" Version="0.1.0-preview.12.26358.3"/>
+        <PackageVersion Include="Shiny.Maui.Controls" Version="2.4.0"/>
+        <PackageVersion Include="Shiny.Maui.Controls.Camera" Version="2.4.0"/>
+        <!-- Android-only: lifts the transitive 1.8.x ktx so it no longer duplicates FragmentKt (see Sample.csproj) -->
+        <PackageVersion Include="Xamarin.AndroidX.Fragment.Ktx" Version="1.9.1"/>
+        <PackageVersion Include="Microsoft.Maui.DevFlow.Agent" Version="0.1.0-preview.13.26526.5"/>
     </ItemGroup>
     <ItemGroup>
-        <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10"/>
-        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1"/>
-        <PackageVersion Include="xunit.v3" Version="3.2.2"/>
-        <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5"/>
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14"/>
+        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0"/>
+        <PackageVersion Include="xunit.v3" Version="4.0.2"/>
+        <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1"/>
         <PackageVersion Include="BenchmarkDotNet" Version="0.15.8"/>
     </ItemGroup>
 </Project>

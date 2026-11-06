@@ -29,9 +29,10 @@ Note on naming: types/namespaces use **FaceIntelligence** as the product brand (
 
 **Repo layout**: shippable packages in `src/`, the demo app in `Sample/` at the root, tests/benchmarks in `tests/`. **Central Package Management** is on — all versions live in `Directory.Packages.props` (CPM), so `<PackageReference>` elements carry **no `Version=`**; add/bump versions there. `Directory.Build.props` hoists the shared `ImplicitUsings`/`Nullable` (per-project settings like `TargetFramework`, `IsAotCompatible`, `IsPackable` stay in each csproj). Note: with two feeds + CPM, restore emits `NU1507` (package-source-mapping advisory) — benign.
 
-**Two version pins are deliberate (don't "update" them blindly)** — both are documented inline in `Directory.Packages.props`:
-- **`Microsoft.ML.OnnxRuntime` is held at `1.20.1`.** ORT `1.27.0` (and other newer revs) break the **Android** manifest merge with `AMM0000` "namespace used in multiple modules" (duplicate `com.google.*` namespaces) on the .NET Android 36.x manifest merger — the app won't build. iOS/tests are fine; the block is Android-only. Revisit when ORT ships an Android AAR compatible with the current merger.
-- **`Microsoft.Maui.Controls` is held at `10.0.71`** to match the prerelease **Shiny camera betas** (`Camera`/`Camera.Face` 0141, `Controls` 0121). Bumping MAUI (e.g. 10.0.80) and/or the camera betas (0142) shifts transitive AndroidX/play-services/firebase versions and re-triggers the same `AMM0000` Android breakage. Bump MAUI and the camera package **together**, and only after verifying the Android head. Everything else in CPM tracks latest stable (xunit v3 4.0 / BenchmarkDotNet 0.16 are prerelease-only, so those stay on latest stable too).
+**Dependencies track latest stable (as of 2026-11-06), with three things to know:**
+- **The old ORT `1.20.1` / MAUI `10.0.71` pins are gone.** ORT 1.31.1, MAUI 10.0.120 and the now-stable Shiny camera/controls `2.4.0` build both Sample heads. They used to break the Android manifest merge (`AMM0000`); if that returns after a bump, those three are the suspects — bump MAUI and the camera package together.
+- **`Xamarin.AndroidX.Fragment.Ktx` is pinned to 1.9.x for the Sample's Android head only.** AndroidX Fragment 1.9 merged the ktx classes into `fragment`; a transitive `Fragment.Ktx` 1.8.x still carries `FragmentKt`, and D8 fails with "Type androidx.fragment.app.FragmentKt is defined multiple times". Drop the reference once nothing pulls the 1.8.x ktx.
+- **Prerelease exceptions:** `BenchmarkDotNet` has no stable release newer than 0.15.8; `Microsoft.Maui.DevFlow.Agent` is preview-only and must match the installed `maui` CLI (`maui devflow version`). .NET 11 RC packages are not taken — the repo targets `net10.0`.
 
 ## Build & run
 
@@ -49,11 +50,12 @@ dotnet build Sample/Sample.csproj -f net10.0-ios
 
 ```bash
 # End-to-end tests (real sqlite-vec store + fake embedder)
-dotnet test tests/Shiny.FaceIntelligence.Tests/Shiny.FaceIntelligence.Tests.csproj
+# xunit v3 4.x runs on Microsoft.Testing.Platform; global.json opts `dotnet test` into MTP, so use --project
+dotnet test --project tests/Shiny.FaceIntelligence.Tests/Shiny.FaceIntelligence.Tests.csproj
 
-# Run one test
-dotnet test tests/Shiny.FaceIntelligence.Tests/Shiny.FaceIntelligence.Tests.csproj \
-  --filter "FullyQualifiedName~MaxDistance_Threshold_IsEnforced"
+# Run one test (MTP/xunit filter syntax, not the VSTest --filter)
+dotnet test --project tests/Shiny.FaceIntelligence.Tests/Shiny.FaceIntelligence.Tests.csproj \
+  --filter-method "*MaxDistance_Threshold_IsEnforced"
 
 # Benchmarks (BenchmarkDotNet — Release only). --job dry validates the harness fast.
 dotnet run --project tests/Shiny.FaceIntelligence.Benchmarks -c Release
@@ -88,7 +90,7 @@ maui devflow ui tree --platform ios --depth 2
 maui devflow logs --platform ios
 ```
 
-Notes: the tunnel (`iproxy`) must stay up for the whole session — relaunching the app or unplugging the phone drops it, just restart iproxy. `maui devflow list` stays `[]` (that's broker auto-discovery, which isn't used on this path); rely on `agent status --platform ios` instead. The **Android head does not build** (ORT/MAUI pin violations, see `Directory.Packages.props`), so device debugging is iOS-only for now.
+Notes: the tunnel (`iproxy`) must stay up for the whole session — relaunching the app or unplugging the phone drops it, just restart iproxy. `maui devflow list` stays `[]` (that's broker auto-discovery, which isn't used on this path); rely on `agent status --platform ios` instead. The Android head builds again (2026-11-06) but has no DevFlow recipe here yet; device debugging is iOS-only.
 
 ## Tests & benchmarks
 
@@ -104,13 +106,13 @@ Key design points when extending:
 - **vec0 is required at runtime**; tests `Assert.Skip` when `Vec0Locator.Find()` returns null (except `Vec0Binary_IsAvailable_OnDeveloperMachine`, which asserts presence to document the dependency). `Vec0Locator` searches next to the assembly and walks up to the committed `runtimes/` folder so BenchmarkDotNet's generated subprocess finds it.
 - These need **no ONNX model** — the model only matters for the real embedder, which isn't exercised here.
 
-`nuget.config` clears sources and restores from **nuget.org only** (the dnceng `dotnet10` feed it once carried is gone — everything the repo needs now ships publicly). Still don't bump MAUI independently of the prerelease Shiny camera package: they move together, see `Directory.Packages.props`.
+`nuget.config` clears sources and restores from **nuget.org only** (the dnceng `dotnet10` feed it once carried is gone — everything the repo needs now ships publicly). Still bump MAUI and the Shiny camera package together.
 
 ## Packaging & CI
 
 `.github/workflows/build.yml` (macos-latest, `ios/android/maccatalyst/macos` workloads — `macos` is there for `Shiny.DocumentIntelligence`'s AppKit target) builds **`build.slnf`** in Release and pushes to nuget.org from `main` and `v*` branches using the `NUGETAPIKEY` secret. Adapted from `~/Desktop/dev/music`, which is the reference layout for every Shiny repo.
 
-- **`build.slnf` is the shipping surface** — the 11 `src/` projects, nothing else. The Sample never builds in CI (it needs the gitignored ONNX models, and its Android head doesn't build at all), and neither do the tests. **Add a new package to `build.slnf` or it is silently never published.**
+- **`build.slnf` is the shipping surface** — the 11 `src/` projects, nothing else. The Sample never builds in CI (it needs the gitignored ONNX models), and neither do the tests. **Add a new package to `build.slnf` or it is silently never published.**
 - **Versioning is Nerdbank.GitVersioning** (`version.json`, `1.0.0-beta.{height}`), referenced globally from `Directory.Build.props`. The workflow needs `fetch-depth: 0` — a shallow clone has no height. `PublicRelease=true` is passed on the command line, which is what drops the `-g<commit>` suffix.
 - **Packing happens on build, not via `dotnet pack`**: `Directory.Build.props` sets `GeneratePackageOnBuild` + `PackageOutputPath=artifacts/` for `Configuration=Release` only, so every package (and `.snupkg`) lands in one folder the workflow uploads and pushes. Debug builds pack nothing.
 - Shared package metadata (authors, MIT, icon, readme, repo url) lives in `Directory.Build.props`; each csproj supplies only its own `<Description>`. `nuget.png`/`nuget.txt` are the standard Shiny package assets. Tests and the Sample carry `IsPackable=false`.
@@ -129,7 +131,7 @@ Sidebar entries live in `~/Desktop/dev/documentation/src/sidebar-topics.mjs` (to
 
 A change is not "done" until code, tests, and the docs are in sync — do them in the same change unless there's a reason not to:
 
-1. **Code + tests** (`src/`, `tests/`) — run the full suite (`dotnet test tests/Shiny.FaceIntelligence.Tests/...` and `tests/Shiny.VoiceIntelligence.Tests/...`), not a filtered subset, and prove new behavior with a test.
+1. **Code + tests** (`src/`, `tests/`) — run the full suite (`dotnet test --project` on each of the four `tests/*Tests` projects), not a filtered subset, and prove new behavior with a test.
 2. **Documentation site** — update the relevant feature page, plus a **release note** (rules below).
 3. **README.md** (repo root) — packed into every NuGet package via `PackageReadmeFile` in `Directory.Build.props`. Update the feature list/table when behavior or packaging changes.
 
