@@ -62,7 +62,9 @@ sealed partial class FrameImageConverter
 
         var h = (int)Math.Round(src.Height * (maxWidth / (float)src.Width));
         var dst = src.Resize(new SKImageInfo(maxWidth, Math.Max(1, h), src.ColorType, src.AlphaType), SKSamplingOptions.Default);
+        if (dst is null)
+            throw new InvalidOperationException("Could not allocate the bounded analysis image.");
         src.Dispose();
-        return dst ?? src;
+        return dst;
     }
 }

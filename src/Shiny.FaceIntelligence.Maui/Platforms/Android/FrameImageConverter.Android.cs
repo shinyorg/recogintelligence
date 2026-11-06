@@ -65,8 +65,9 @@ partial class FrameImageConverter
         System.Runtime.InteropServices.Marshal.Copy(dst, 0, bmp.GetPixels(), dst.Length);
         bmp.NotifyPixelsChanged();
 
-        // Already downscaled by `step`, so only orientation is left.
-        return Orient(bmp, frame.Rotation, frame.IsMirrored);
+        // Integer subsampling is only a coarse bound, and rotation can swap width/height.
+        // Apply the final cap in upright space, just like the Apple converter.
+        return LimitWidth(Orient(bmp, frame.Rotation, frame.IsMirrored), maxWidth);
     }
 
     static byte[] ReadPlane(AndroidX.Camera.Core.IImageProxyPlaneProxy plane)
