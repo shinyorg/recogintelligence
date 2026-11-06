@@ -62,6 +62,27 @@ public record FaceEnrollmentResult(
     float MinPairwiseDistance,
     int SkippedSteps = 0)
 {
-    /// <summary>Successfully persisted captures of this run; original step indices are never renumbered.</summary>
+    /// <summary>
+    /// Every shot this run stored, in capture order. Step indices refer to the original
+    /// <see cref="FaceEnrollmentView.Steps"/> and are never renumbered, so skipped steps show as gaps.
+    /// Pass the <see cref="FaceEnrollmentCapture.ShotId"/>s to <c>IFaceIntelligence.ForgetShots</c> to undo
+    /// just this run.
+    /// </summary>
     public IReadOnlyList<FaceEnrollmentCapture> Captures { get; init; } = [];
 }
+
+/// <summary>One shot a guided enrollment run stored.</summary>
+/// <param name="StepIndex">Index into <see cref="FaceEnrollmentView.Steps"/> of the step that produced it.</param>
+/// <param name="ShotId">The stored document id (<see cref="Person.Id"/>) — what <c>ForgetShots</c> takes.</param>
+/// <param name="ImageData">
+/// The upright, mirror-corrected analysis JPEG that was embedded — byte for byte what recognition sees, not
+/// the person's display thumbnail. Read-only so a consumer can't alter the record.
+/// </param>
+/// <param name="ImageWidth">Width of <paramref name="ImageData"/> in pixels.</param>
+/// <param name="ImageHeight">Height of <paramref name="ImageData"/> in pixels.</param>
+public sealed record FaceEnrollmentCapture(
+    int StepIndex,
+    string ShotId,
+    ReadOnlyMemory<byte> ImageData,
+    int ImageWidth,
+    int ImageHeight);
