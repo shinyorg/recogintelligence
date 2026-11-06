@@ -26,9 +26,12 @@ sealed partial class FrameImageConverter
     public partial SKBitmap? ToUpright(CameraFrame frame, int maxWidth);
 
     /// <summary>
-    /// Apply the frame's sensor rotation and front-camera mirror so the scene is upright. The mirror is
-    /// applied in <i>sensor</i> space (before the rotation) because that's where the flip physically happens —
-    /// Skia composes the matrix so the last transform applied is the innermost one.
+    /// Apply the frame's sensor rotation and front-camera mirror so the scene is upright. Order matters for
+    /// 90/270: <see cref="CameraFrame"/>'s contract (and the camera library's own <c>CoordinateTransform</c>)
+    /// is <i>rotate clockwise first, then mirror horizontally in upright space</i>. Mirroring in sensor space
+    /// instead turns a rotated front-camera frame upside down. Skia composes the matrix so the last transform
+    /// applied is the innermost one, hence Scale is issued before RotateDegrees. Apple frames always arrive
+    /// with rotation 0, so only Android's front camera (rotation 270 + mirrored) ever exercised this.
     /// </summary>
     internal static SKBitmap Orient(SKBitmap src, int rotationDegrees, bool mirrored)
     {
@@ -62,8 +65,10 @@ sealed partial class FrameImageConverter
 
         var h = (int)Math.Round(src.Height * (maxWidth / (float)src.Width));
         var dst = src.Resize(new SKImageInfo(maxWidth, Math.Max(1, h), src.ColorType, src.AlphaType), SKSamplingOptions.Default);
+        // A failed resize keeps the (wider) source rather than throwing on the analysis thread; the old
+        // `dst ?? src` after src.Dispose() handed back a disposed bitmap.
         if (dst is null)
-            throw new InvalidOperationException("Could not allocate the bounded analysis image.");
+            return src;
         src.Dispose();
         return dst;
     }
