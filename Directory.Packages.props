@@ -11,6 +11,8 @@
         <PackageVersion Include="Shiny.DocumentDb" Version="14.1.0"/>
         <PackageVersion Include="Shiny.DocumentDb.Sqlite" Version="14.1.0"/>
         <PackageVersion Include="Shiny.DocumentDb.Sqlite.VectorSupport" Version="14.1.0"/>
+        <!-- Security floor: 2.1.11 (pulled by Microsoft.Data.Sqlite) is GHSA-2m69-gcr7-jv3q. -->
+        <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14"/>
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.4"/>
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.Text.Recognition" Version="119.0.1.9"/>
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.9"/>

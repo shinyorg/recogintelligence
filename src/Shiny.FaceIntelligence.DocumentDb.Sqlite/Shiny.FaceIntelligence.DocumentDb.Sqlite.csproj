@@ -9,6 +9,8 @@
     <ItemGroup>
         <PackageReference Include="Shiny.DocumentDb.Sqlite" />
         <PackageReference Include="Shiny.DocumentDb.Sqlite.VectorSupport" />
+        <!-- Lifts the transitive SQLitePCLRaw 2.1.11 (GHSA-2m69-gcr7-jv3q, high) that Microsoft.Data.Sqlite still floors at. -->
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     </ItemGroup>
 
     <ItemGroup>
