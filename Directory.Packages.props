@@ -18,6 +18,8 @@
         <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.9"/>
     </ItemGroup>
     <ItemGroup>
+        <!-- Test-only: FaceGuide/FaceGuideDrawable compile into the net10.0 face tests. Keep in step with MAUI. -->
+        <PackageVersion Include="Microsoft.Maui.Graphics" Version="10.0.120"/>
         <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.120"/>
         <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.14"/>
         <PackageVersion Include="Shiny.Maui.Shell" Version="7.0.3"/>

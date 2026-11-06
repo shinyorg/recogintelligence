@@ -39,6 +39,13 @@ public record FaceGuide(
     public const float AspectRatio = 0.78f;
 
     /// <summary>
+    /// Oval width ÷ height, measured in <b>view pixels</b> (so the oval keeps its shape on any frame aspect).
+    /// Defaults to <see cref="AspectRatio"/>. This only changes what is drawn: <see cref="IsAligned"/> gates on
+    /// the face's centre and height, never its width. Values ≤ 0 fall back to the default.
+    /// </summary>
+    public float OvalAspectRatio { get; init; } = AspectRatio;
+
+    /// <summary>
     /// Re-express this guide, whose coordinates are fractions of the <b>visible</b> preview, as fractions of
     /// the full frame — the space detections arrive in.
     /// </summary>
