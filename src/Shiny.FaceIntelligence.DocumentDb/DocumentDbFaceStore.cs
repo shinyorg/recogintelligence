@@ -33,4 +33,13 @@ public class DocumentDbFaceStore(IDocumentStore store) : IFaceStore
 
     public Task<int> RemoveByPersonIdentifier(string personIdentifier, CancellationToken ct = default)
         => store.Query<Person>().Where(p => p.PersonIdentifier == personIdentifier).ExecuteDelete(ct);
+
+    public async Task<int> RemoveShots(string personIdentifier, IReadOnlyCollection<string> personIds, CancellationToken ct = default)
+    {
+        var removed = 0;
+        foreach (var id in personIds.Distinct(StringComparer.Ordinal))
+            removed += await store.Query<Person>()
+                .Where(p => p.PersonIdentifier == personIdentifier && p.Id == id).ExecuteDelete(ct);
+        return removed;
+    }
 }

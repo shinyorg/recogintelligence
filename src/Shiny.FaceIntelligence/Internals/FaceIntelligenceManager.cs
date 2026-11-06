@@ -98,6 +98,15 @@ public class FaceIntelligenceManager(
 
     public Task<int> Forget(string personIdentifier, CancellationToken ct = default) => store.RemoveByPersonIdentifier(personIdentifier, ct);
 
+    public Task<int> ForgetShots(string personIdentifier, IReadOnlyCollection<string> personIds, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(personIdentifier);
+        ArgumentNullException.ThrowIfNull(personIds);
+        if (personIds.Any(String.IsNullOrWhiteSpace))
+            throw new ArgumentException("Shot IDs cannot be empty.", nameof(personIds));
+        return store.RemoveShots(personIdentifier, personIds, ct);
+    }
+
     async Task<RecognitionResult> Match(ReadOnlyMemory<float> query, CancellationToken ct)
     {
         var hits = await store.FindNearest(query, options.CandidateCount, ct);

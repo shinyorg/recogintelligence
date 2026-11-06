@@ -48,4 +48,8 @@ public interface IFaceIntelligence
 
     /// <summary>Delete every enrolled shot for a given identity. Returns the number removed.</summary>
     Task<int> Forget(string personIdentifier, CancellationToken ct = default);
+
+    /// <summary>Delete only selected shot IDs belonging to this identity, preserving other runs.</summary>
+    Task<int> ForgetShots(string personIdentifier, IReadOnlyCollection<string> personIds, CancellationToken ct = default)
+        => throw new NotSupportedException("This face store does not support scoped enrollment cleanup.");
 }

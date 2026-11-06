@@ -68,6 +68,19 @@ public class FaceIntelligenceManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task ForgetShots_PreservesOtherSetsAndOtherPeopleAndRemovesVector()
+    {
+        RequireVec0();
+        var rec = this.Create();
+        var kept = await rec.Enroll("7", TestFaces.Image(1, 0, 0, 0, 0, 0, 0, 0), AnyBox);
+        var removed = await rec.Enroll("7", TestFaces.Image(0, 1, 0, 0, 0, 0, 0, 0), AnyBox);
+        var other = await rec.Enroll("8", TestFaces.Image(0, 0, 1, 0, 0, 0, 0, 0), AnyBox);
+        Assert.Equal(1, await rec.ForgetShots("7", [removed.Id, removed.Id, other.Id]));
+        Assert.Equal(new[] { kept.Id, other.Id }.Order(), (await rec.GetAll()).Select(p => p.Id).Order());
+        Assert.False((await rec.Recognize(TestFaces.Image(0, 1, 0, 0, 0, 0, 0, 0), AnyBox)).IsMatch);
+    }
+
+    [Fact]
     public async Task Enroll_Then_Recognize_SamePerson_Matches()
     {
         RequireVec0();
