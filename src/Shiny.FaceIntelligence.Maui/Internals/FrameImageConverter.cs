@@ -44,9 +44,9 @@ sealed partial class FrameImageConverter
         using (var canvas = new SKCanvas(dst))
         {
             canvas.Translate(w / 2f, h / 2f);
-            canvas.RotateDegrees(rot);
             if (mirrored)
                 canvas.Scale(-1, 1);
+            canvas.RotateDegrees(rot);
             canvas.Translate(-src.Width / 2f, -src.Height / 2f);
             canvas.DrawBitmap(src, new SKPoint(0, 0), SKSamplingOptions.Default);
         }
