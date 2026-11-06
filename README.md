@@ -66,6 +66,20 @@ BenchmarkDotNet v0.15.8 · Apple M5 Pro · .NET 10.0.8 (Arm64) · macOS 26.5
 
 Brute-force exact search scales roughly linearly with gallery size (`VectorIndexKind.None`); ~4.8 ms at 10k enrolled shots is comfortable for on-device use. Managed allocations are constant (the result set), independent of gallery size. For much larger galleries, switch to an ANN index.
 
+## Windows
+
+On a **Windows host** the face and voice MAUI controls also target `net10.0-windows10.0.19041.0`
+(minimum 10.0.17763.0), and the face camera adapter reads `WindowsCameraFrame`'s BGRA8 buffer through
+the same upright-orientation and max-width pipeline as the other platforms.
+
+```powershell
+./Sample/fetch-models.ps1
+dotnet build Sample/Sample.csproj -f net10.0-windows10.0.19041.0
+```
+
+The published NuGet packages are built on macOS and **do not include the Windows target yet** — Windows is
+build-from-source only for now, and hasn't been verified against a physical Windows camera.
+
 ## Development
 
 Architecture, build/pack details, the ONNX Runtime iOS linker fix, tuning, and the open TODOs (identity hardening, coordinate space, landmark alignment) are documented in **[CLAUDE.md](CLAUDE.md)** — the canonical reference for working in this repo.
