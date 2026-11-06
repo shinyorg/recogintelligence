@@ -31,6 +31,76 @@ public class FaceRecognitionAnalyzer : FrameAnalyzer
     readonly IFaceDetector detector;
     readonly FrameImageConverter converter = new();
 
+    readonly object recognitionGate = new();
+    CancellationTokenSource sessionCancellation = new();
+    Task recognitionWork = Task.CompletedTask;
+    long frameId;
+    volatile bool accepting = true;
+
+    /// <summary>
+    /// Identifies the current camera session. A new id is minted by <see cref="BeginSession"/>; every
+    /// <see cref="FaceFrameObservation"/> and <see cref="FaceRecognizedEventArgs.Stamp"/> carries the id of the
+    /// session it came from, and results from an older session are never raised.
+    /// </summary>
+    public Guid SessionId { get; private set; } = Guid.NewGuid();
+
+    /// <summary>
+    /// Raised on the UI thread for <b>every</b> analyzed frame — no face, several faces, a face outside the scan
+    /// window, or a conversion failure (<see cref="FaceFrameObservation.Error"/>). Use it for live diagnostics or
+    /// to apply your own policy (e.g. "exactly one face"). Brightness/sharpness are only measured while something
+    /// is subscribed, because measuring costs a JPEG decode per frame.
+    /// </summary>
+    public event EventHandler<FaceFrameObservation>? FrameObserved;
+
+    /// <summary>Brightness below this classifies an observation as <see cref="FaceFrameQuality.TooDark"/>. Default 0.18.</summary>
+    public float MinBrightness { get; set; } = 0.18f;
+
+    /// <summary>Brightness above this classifies an observation as <see cref="FaceFrameQuality.TooBright"/>. Default 0.92.</summary>
+    public float MaxBrightness { get; set; } = 0.92f;
+
+    /// <summary>Variance-of-Laplacian below this classifies an observation as <see cref="FaceFrameQuality.Blurry"/>. Default 8.</summary>
+    public float MinSharpness { get; set; } = 8f;
+
+    /// <summary>
+    /// Start a fresh session: resets stability/last result and cancels any recognition still running for the
+    /// previous one. The hosting controls call this every time the camera starts.
+    /// </summary>
+    public void BeginSession()
+    {
+        lock (recognitionGate)
+        {
+            sessionCancellation.Cancel();
+            sessionCancellation = new();
+            SessionId = Guid.NewGuid(); accepting = true;
+            stableFrames = 0; lastBounds = null; lastResult = null; LastFace = null;
+            lastRecognizedAt = DateTimeOffset.MinValue;
+        }
+    }
+
+    /// <summary>
+    /// Stop admitting frames, cancel in-flight recognition and wait up to <paramref name="timeout"/> for it to
+    /// finish. Returns false if it was still running at the timeout. No result from the stopped session is raised.
+    /// </summary>
+    public async Task<bool> StopSessionAsync(TimeSpan timeout)
+    {
+        Task pending;
+        lock (recognitionGate)
+        {
+            accepting = false; sessionCancellation.Cancel(); LastFace = null;
+            pending = recognitionWork;
+        }
+        try { await pending.WaitAsync(timeout).ConfigureAwait(false); return true; }
+        catch (TimeoutException) { return false; }
+        catch (OperationCanceledException) { return true; }
+    }
+
+    void Publish(FaceFrameObservation observation)
+        => this.Raise(() =>
+        {
+            if (accepting && observation.Stamp.SessionId == SessionId)
+                FrameObserved?.Invoke(this, observation);
+        });
+
     int stableFrames;
     RectF? lastBounds;
     DateTimeOffset lastRecognizedAt = DateTimeOffset.MinValue;
@@ -134,22 +204,31 @@ public class FaceRecognitionAnalyzer : FrameAnalyzer
     /// <inheritdoc/>
     public override async ValueTask<IReadOnlyList<OverlayBox>?> AnalyzeAsync(CameraFrame frame, CancellationToken ct)
     {
-        if (!this.IsEnabled)
+        if (!this.IsEnabled || !accepting)
             return null;
+        var stamp = new FaceFrameStamp(SessionId, Interlocked.Increment(ref frameId),
+            System.Diagnostics.Stopwatch.GetTimestamp(), DateTime.UtcNow);
+        try
+        {
 
         using var bmp = this.converter.ToUpright(frame, this.MaxAnalysisWidth);
         if (bmp is null || bmp.Width == 0 || bmp.Height == 0)
-            return null;
+            throw new InvalidOperationException("Frame conversion failed.");
 
         // Both the detector and the recognizer take encoded bytes, so encode once and reuse for both stages.
         using var encoded = bmp.Encode(SKEncodedImageFormat.Jpeg, 85);
         if (encoded is null)
-            return null;
+            throw new InvalidOperationException("Frame encoding failed.");
         var bytes = encoded.ToArray();
 
-        var best = this.BestFace(bytes);
+        // Several faces → track the most confident one, as before. FaceCount reports the real number, so a host
+        // that wants "exactly one person in frame" can enforce it from FrameObserved.
+        var faces = this.detector.Detect(bytes).Where(f => f.Confidence >= this.MinConfidence).ToArray();
+        DetectedFace? best = faces.Length == 0 ? null : faces.MaxBy(f => f.Confidence);
         if (best is null)
         {
+            Publish(new(stamp, faces.Length, null, false, null, null, null,
+                FaceFrameQuality.Unknown, bytes, bmp.Width, bmp.Height));
             // Face gone: drop the boxes and reset, so walking away then back re-recognizes immediately.
             var had = this.LastFace is not null;
             this.stableFrames = 0;
@@ -157,16 +236,35 @@ public class FaceRecognitionAnalyzer : FrameAnalyzer
             this.lastResult = null;
             this.LastFace = null;
             if (had)
-                this.Raise(() => this.FaceLost?.Invoke(this, EventArgs.Empty));
+                this.Raise(() => { if (accepting && stamp.SessionId == SessionId) this.FaceLost?.Invoke(this, EventArgs.Empty); });
             return null;
         }
 
         var face = best.Value;
         var bounds = Normalize(face.Box, bmp.Width, bmp.Height);
-        if (!this.InScanWindow(bounds))
+        var inWindow = this.InScanWindow(bounds);
+
+        // Quality is diagnostic only — it never gates recognition (FaceRecognized must fire for every attempt),
+        // and measuring decodes the JPEG again, so skip it when nobody is listening.
+        float? sharpness = null, brightness = null;
+        var quality = FaceFrameQuality.Unknown;
+        if (this.FrameObserved is not null)
         {
-            this.stableFrames = 0;
-            this.lastBounds = null;
+            var (s, b) = FrameQuality.Measure(bytes, face.Box);
+            sharpness = s; brightness = b;
+            quality = b < MinBrightness ? FaceFrameQuality.TooDark
+                : b > MaxBrightness ? FaceFrameQuality.TooBright
+                : s < MinSharpness ? FaceFrameQuality.Blurry : FaceFrameQuality.Usable;
+        }
+        Publish(new(stamp, faces.Length, bounds, inWindow, face.Confidence, brightness, sharpness,
+            quality, bytes, bmp.Width, bmp.Height));
+        if (!inWindow)
+        {
+            // Same as the face leaving: raise FaceLost once on the transition, not on every frame outside.
+            var hadFace = this.LastFace is not null;
+            this.stableFrames = 0; this.lastBounds = null; this.lastResult = null; this.LastFace = null;
+            if (hadFace)
+                this.Raise(() => { if (stamp.SessionId == SessionId && accepting) this.FaceLost?.Invoke(this, EventArgs.Empty); });
             return null;
         }
 
@@ -174,50 +272,54 @@ public class FaceRecognitionAnalyzer : FrameAnalyzer
         this.lastBounds = bounds;
         var analyzed = new AnalyzedFace(bytes, face.Box, bounds, face.Confidence, this.stableFrames, bmp.Width, bmp.Height);
         this.LastFace = analyzed;
-        this.Raise(() => this.FaceDetected?.Invoke(this, analyzed));
+        this.Raise(() => { if (accepting && stamp.SessionId == SessionId) this.FaceDetected?.Invoke(this, analyzed); });
 
+        var bmpWidth = bmp.Width;
+        var bmpHeight = bmp.Height;
         if (this.RecognitionEnabled && this.ShouldRecognize())
         {
-            this.lastRecognizedAt = DateTimeOffset.UtcNow;
-            try
+            lock (recognitionGate)
             {
-                var result = await this.intelligence.Recognize(bytes, face.Box, ct).ConfigureAwait(false);
-                this.lastResult = result;
-
-                var args = new FaceRecognizedEventArgs(result, bounds, face.Confidence);
-                this.Raise(() =>
+                if (recognitionWork.IsCompleted && accepting && stamp.SessionId == SessionId)
                 {
-                    this.FaceRecognized?.Invoke(this, args);
-                    if (this.FaceRecognizedCommand?.CanExecute(args) == true)
-                        this.FaceRecognizedCommand.Execute(args);
-                });
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                // A failed recognize (missing model, store error) must not kill the analysis loop — keep
-                // drawing boxes and let the next interval retry. The consumer sees no event.
-                this.lastResult = null;
+                    lastRecognizedAt = DateTimeOffset.UtcNow;
+                    var token = sessionCancellation.Token;
+                    recognitionWork = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var result = await intelligence.Recognize(bytes, face.Box, token).ConfigureAwait(false);
+                            if (token.IsCancellationRequested) return;
+                            var args = new FaceRecognizedEventArgs(result, bounds, face.Confidence) { Stamp = stamp };
+                            this.Raise(() =>
+                            {
+                                if (!accepting || stamp.SessionId != SessionId) return;
+                                lastResult = result;
+                                FaceRecognized?.Invoke(this, args);
+                                if (FaceRecognizedCommand?.CanExecute(args) == true) FaceRecognizedCommand.Execute(args);
+                            });
+                        }
+                        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+                        catch (Exception ex)
+                        {
+                            Publish(new(stamp, faces.Length, bounds, inWindow, face.Confidence, brightness, sharpness,
+                                quality, null, bmpWidth, bmpHeight, ex.GetType().Name));
+                        }
+                    }, CancellationToken.None);
+                }
             }
         }
 
         return this.ShowBoundingBox ? [this.ToOverlay(bounds)] : null;
-    }
-
-    DetectedFace? BestFace(byte[] imageData)
-    {
-        DetectedFace? best = null;
-        foreach (var f in this.detector.Detect(imageData))
-        {
-            if (f.Confidence < this.MinConfidence)
-                continue;
-            if (best is null || f.Confidence > best.Value.Confidence)
-                best = f;
         }
-        return best;
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            this.LastFace = null;
+            Publish(new(stamp, 0, null, false, null, null, null, FaceFrameQuality.Unknown,
+                null, 0, 0, ex.GetType().Name));
+            return null;
+        }
     }
 
     bool IsSteady(RectF bounds)

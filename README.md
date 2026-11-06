@@ -83,3 +83,7 @@ build-from-source only for now, and hasn't been verified against a physical Wind
 ## Development
 
 Architecture, build/pack details, the ONNX Runtime iOS linker fix, tuning, and the open TODOs (identity hardening, coordinate space, landmark alignment) are documented in **[CLAUDE.md](CLAUDE.md)** — the canonical reference for working in this repo.
+
+## Commercial Support
+
+Shipping this to production? [ShinySoft Technologies](https://shinysoft.biz), the company that builds and maintains the Shiny libraries, offers priority issue response, support agreements, architecture reviews and private office hours. See [Commercial Support](https://shinylib.net/foundation/support/?utm_source=github&utm_medium=readme#commercial-support) or [get in touch](https://shinysoft.biz/contact?utm_source=github&utm_medium=readme). Community support through GitHub issues and discussions stays free.

@@ -8,8 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="Microsoft.Maui.Graphics" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="xunit.v3" />
         <PackageReference Include="xunit.runner.visualstudio" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
@@ -22,7 +22,16 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- Exercise actual shared bitmap operations without a native camera. -->
+        <!-- Linked .Maui sources that need no Controls/platform: the analyzer (camera base class stubbed in
+             FaceRecognitionContinuityTests.cs — keep that stub in step with Shiny.Maui.Controls.Camera), the
+             enrollment run, bitmap conversion and guide geometry. -->
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceFrameObservation.cs" Link="Camera/FaceFrameObservation.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceRecognitionAnalyzer.cs" Link="Camera/FaceRecognitionAnalyzer.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceRecognizedEventArgs.cs" Link="Camera/FaceRecognizedEventArgs.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/AnalyzedFace.cs" Link="Camera/AnalyzedFace.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/Internals/FrameQuality.cs" Link="Camera/FrameQuality.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceEnrollmentCapture.cs" Link="Enrollment/FaceEnrollmentCapture.cs" />
+        <Compile Include="../../src/Shiny.FaceIntelligence.Maui/Internals/FaceEnrollmentRun.cs" Link="Enrollment/FaceEnrollmentRun.cs" />
         <Compile Include="../../src/Shiny.FaceIntelligence.Maui/Internals/FrameImageConverter.cs" Link="Imaging/FrameImageConverter.cs" />
         <!-- Pure geometry (FaceGuide + drawable): Microsoft.Maui.Graphics only, no Controls/platform. -->
         <Compile Include="../../src/Shiny.FaceIntelligence.Maui/FaceGuide.cs" Link="Geometry/FaceGuide.cs" />
