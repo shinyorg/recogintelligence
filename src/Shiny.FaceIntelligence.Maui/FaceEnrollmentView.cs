@@ -47,6 +47,7 @@ public class FaceEnrollmentView : ContentView
     readonly List<AnalyzedFace> captured = [];
     readonly List<float[]> capturedEmbeddings = [];
     readonly List<Person> people = [];
+    readonly List<FaceEnrollmentCapture> acceptedCaptures = [];
 
     FaceRecognitionAnalyzer? analyzer;
     IFaceEmbedder? embedder;
@@ -222,6 +223,7 @@ public class FaceEnrollmentView : ContentView
         this.captured.Clear();
         this.capturedEmbeddings.Clear();
         this.people.Clear();
+        this.acceptedCaptures.Clear();
         this.stepIndex = 0;
         this.running = true;
         this.BeginStep();
@@ -582,7 +584,10 @@ public class FaceEnrollmentView : ContentView
         {
             // The box-based overload: no re-detection, and no duplicate gate — the sequence is explicitly one
             // person, so shots 2..n are *expected* to match shot 1.
-            this.people.Add(await store.Enroll(id, shot.ImageData, shot.Box));
+            var person = await store.Enroll(id, shot.ImageData, shot.Box);
+            this.people.Add(person);
+            this.acceptedCaptures.Add(new FaceEnrollmentCapture(
+                this.stepIndex, person.Id, shot.ImageData, shot.ImageWidth, shot.ImageHeight));
             Console.WriteLine($"[Enroll] stored shot {this.people.Count} for '{id}'");
             return true;
         }
@@ -614,7 +619,8 @@ public class FaceEnrollmentView : ContentView
         this.instructionLabel.Text = $"Enrolled {this.people.Count} shots for {id}";
         this.hintLabel.Text = skipped > 0 ? $"{skipped} step(s) skipped" : String.Empty;
         this.Completed?.Invoke(this, new FaceEnrollmentResult(
-            id, this.people.ToList(), this.capturedEmbeddings.Count > 1 ? minPair : 0f, skipped));
+            id, this.people.ToList(), this.capturedEmbeddings.Count > 1 ? minPair : 0f, skipped)
+        { Captures = this.acceptedCaptures.ToArray() });
     }
 
     /// <summary>Surface a failure rather than ending the sequence quietly with nothing saved.</summary>

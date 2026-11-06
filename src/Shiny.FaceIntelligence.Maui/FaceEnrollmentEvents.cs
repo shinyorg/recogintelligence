@@ -60,4 +60,8 @@ public record FaceEnrollmentResult(
     string PersonIdentifier,
     IReadOnlyList<Person> People,
     float MinPairwiseDistance,
-    int SkippedSteps = 0);
+    int SkippedSteps = 0)
+{
+    /// <summary>Successfully persisted captures of this run; original step indices are never renumbered.</summary>
+    public IReadOnlyList<FaceEnrollmentCapture> Captures { get; init; } = [];
+}
