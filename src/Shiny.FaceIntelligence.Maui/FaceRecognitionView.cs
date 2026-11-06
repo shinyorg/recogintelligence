@@ -164,7 +164,12 @@ public class FaceRecognitionView : ContentView
     void EnsureAnalyzer()
     {
         if (this.analyzer is not null)
+        {
+            // Stop() detaches the analyzer from the camera; a restart (page re-appearing, HandlerChanged)
+            // must re-attach it, or the preview comes back with nothing analyzing it.
+            this.camera.Analyzer ??= this.analyzer;
             return;
+        }
 
         this.analyzer = this.Resolve<FaceRecognitionAnalyzer>();
         if (this.analyzer is null)
