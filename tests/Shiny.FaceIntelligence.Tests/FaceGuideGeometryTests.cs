@@ -22,6 +22,29 @@ public class FaceGuideGeometryTests
     }
 
     [Fact]
+    public void SetPreviewGuide_BeforeFirstFrame_KeepsOvalInPlaceWhenCameraAspectArrives()
+    {
+        var drawable = new FaceGuideDrawable();
+        var guide = new FaceGuide(Height: .8f);
+        var preview = new RectF(0, 0, 320, 400);
+
+        drawable.SetPreviewGuide(guide, preview.Width / preview.Height);
+        var initial = FaceGuideDrawable.OvalInView(Assert.IsType<FaceGuide>(drawable.Guide), preview, drawable.ImageAspect);
+        Assert.Null(drawable.Face);
+        Assert.Equal(320f, initial.Height, .01f);
+        Assert.Equal(160f, initial.Center.X, .01f);
+        Assert.Equal(200f, initial.Center.Y, .01f);
+
+        drawable.ImageAspect = 9f / 16f;
+        drawable.SetPreviewGuide(guide, preview.Width / preview.Height);
+        var updated = FaceGuideDrawable.OvalInView(Assert.IsType<FaceGuide>(drawable.Guide), preview, drawable.ImageAspect);
+        Assert.Equal(initial.X, updated.X, .01f);
+        Assert.Equal(initial.Y, updated.Y, .01f);
+        Assert.Equal(initial.Width, updated.Width, .01f);
+        Assert.Equal(initial.Height, updated.Height, .01f);
+    }
+
+    [Fact]
     public void InvalidRatio_FallsBackToDefault()
     {
         var oval = FaceGuideDrawable.OvalInView(new FaceGuide(Height: .5f) { OvalAspectRatio = 0f }, new RectF(0, 0, 300, 300), 1f);
