@@ -35,6 +35,10 @@ sealed class FaceGuideDrawable : IDrawable
     public Color AlignedColor { get; set; } = Colors.LimeGreen;
     public Color UnalignedColor { get; set; } = Color.FromArgb("#FFD27F");
 
+    /// <summary>Projects the visible guide using the current image aspect, even before detection starts.</summary>
+    internal void SetPreviewGuide(FaceGuide? guide, float viewAspect) =>
+        this.Guide = guide?.ToImageSpace(this.ImageAspect, viewAspect);
+
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
         if (this.Guide is not { } guide)

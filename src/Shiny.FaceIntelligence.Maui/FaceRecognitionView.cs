@@ -51,6 +51,7 @@ public class FaceRecognitionView : ContentView
             ScaleMode = PreviewScaleMode.AspectFill
         };
         this.guideOverlay = new GraphicsView { Drawable = this.guideDrawable, InputTransparent = true, IsVisible = false };
+        this.guideOverlay.SizeChanged += (_, _) => this.RefreshGuide();
         this.Content = new Grid { Children = { this.camera, this.guideOverlay } };
 
         // Whichever of these lands last actually starts the camera; StartCameraAsync is idempotent.
@@ -94,11 +95,10 @@ public class FaceRecognitionView : ContentView
             this.guide = value;
             if (value is null)
             {
-                this.guideDrawable.Guide = null;
                 this.guideDrawable.Face = null;
                 this.lastGuideAligned = null;
-                this.guideOverlay.Invalidate();
             }
+            this.RefreshGuide();
         }
     }
     FaceGuide? guide;
@@ -126,10 +126,7 @@ public class FaceRecognitionView : ContentView
     {
         if (this.Guide is not { } guide || observation.Bounds is not { } bounds
             || observation.ImageWidth <= 0 || observation.ImageHeight <= 0) return null;
-        var width = this.guideOverlay.Width > 0 ? this.guideOverlay.Width : this.Width;
-        var height = this.guideOverlay.Height > 0 ? this.guideOverlay.Height : this.Height;
-        var viewAspect = width > 0 && height > 0 ? (float)(width / height) : 1f;
-        return guide.ToImageSpace((float)observation.ImageWidth / observation.ImageHeight, viewAspect).IsAligned(bounds);
+        return guide.ToImageSpace((float)observation.ImageWidth / observation.ImageHeight, this.GuideViewAspect).IsAligned(bounds);
     }
     /// <summary>Raised once <see cref="Analyzer"/> has been resolved and attached, so it can be tuned.</summary>
     public event EventHandler? AnalyzerReady;
@@ -273,22 +270,34 @@ public class FaceRecognitionView : ContentView
         AnalyzerReady?.Invoke(this, EventArgs.Empty);
     }
 
+    float GuideViewAspect
+    {
+        get
+        {
+            var width = this.guideOverlay.Width > 0 ? this.guideOverlay.Width : this.Width;
+            var height = this.guideOverlay.Height > 0 ? this.guideOverlay.Height : this.Height;
+            return width > 0 && height > 0 ? (float)(width / height) : 1f;
+        }
+    }
+
+    void RefreshGuide()
+    {
+        this.guideDrawable.SetPreviewGuide(this.Guide, this.GuideViewAspect);
+        this.guideOverlay.Invalidate();
+    }
+
     void UpdateGuide(FaceFrameObservation observation)
     {
-        if (this.Guide is not { } guide) return;
+        if (this.Guide is null) return;
         this.guideDrawable.Face = observation.Bounds;
         if (observation.ImageWidth > 0 && observation.ImageHeight > 0)
             this.guideDrawable.ImageAspect = (float)observation.ImageWidth / observation.ImageHeight;
-        var width = this.guideOverlay.Width > 0 ? this.guideOverlay.Width : this.Width;
-        var height = this.guideOverlay.Height > 0 ? this.guideOverlay.Height : this.Height;
-        var viewAspect = width > 0 && height > 0 ? (float)(width / height) : 1f;
-        this.guideDrawable.Guide = guide.ToImageSpace(this.guideDrawable.ImageAspect, viewAspect);
         var aligned = this.IsInsideGuide(observation);
         this.UpdateGuideAlignment(aligned == true);
-        this.guideOverlay.Invalidate();
+        this.RefreshGuide();
         this.GuideFeedbackChanged?.Invoke(this, new FaceGuideFeedback(aligned,
             aligned == false && observation.Bounds is { } bounds
-                ? this.guideDrawable.Guide.Correction(bounds) : null));
+                ? this.guideDrawable.Guide?.Correction(bounds) : null));
     }
 
     void UpdateGuideAlignment(bool aligned)

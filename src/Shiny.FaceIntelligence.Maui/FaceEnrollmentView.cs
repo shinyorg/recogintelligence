@@ -64,7 +64,6 @@ public class FaceEnrollmentView : ContentView
     bool evaluating;
     int stepIndex;
     bool? lastGuideAligned;
-    bool haveFrameAspect;
 
     IDispatcherTimer? countdownTimer;
     int countdownRemaining;
@@ -117,6 +116,11 @@ public class FaceEnrollmentView : ContentView
         {
             Drawable = this.guideDrawable,
             InputTransparent = true
+        };
+        this.guideOverlay.SizeChanged += (_, _) =>
+        {
+            if (this.running && this.stepIndex < this.runSteps.Length)
+                this.RefreshGuide();
         };
 
         this.Content = new Grid { Children = { this.camera, this.guideOverlay, this.banner } };
@@ -331,18 +335,11 @@ public class FaceEnrollmentView : ContentView
     {
         this.armed = false;
         this.countdownRemaining = Math.Max(1, (int)Math.Ceiling(this.StepCountdown.TotalSeconds));
-        // Draw the next guide immediately during the countdown. Reproject it again when the
-        // first analyzed frame supplies the camera's exact image aspect.
-        // Draw the next guide during the countdown — but only once a frame has told us the real image aspect;
-        // projecting with the drawable's placeholder aspect makes the oval jump when the first frame lands.
-        this.guideDrawable.Guide = this.haveFrameAspect
-            ? this.EffectiveGuide(this.runSteps[this.stepIndex], this.guideDrawable.ImageAspect)
-            : null;
         this.AbortAnimation("FaceGuideAlignment");
         this.guideDrawable.IsAligned = false;
         this.guideDrawable.AlignmentProgress = 0;
         this.lastGuideAligned = null;
-        this.guideOverlay.Invalidate();
+        this.RefreshGuide();
         this.ReportProgress();
         this.CountdownChanged?.Invoke(this, new FaceEnrollmentCountdown(this.stepIndex,
             this.StepCountdown <= TimeSpan.Zero ? 0 : this.countdownRemaining));
@@ -634,7 +631,6 @@ public class FaceEnrollmentView : ContentView
         // even while an evaluation is in flight, otherwise the feedback visibly stalls.
         this.guideDrawable.Face = face.Bounds;
         this.guideDrawable.ImageAspect = face.Aspect;
-        this.haveFrameAspect = true;
         this.guideDrawable.Guide = guide;
         this.UpdateGuideAlignment(guide?.IsAligned(face.Bounds) ?? true);
         this.guideOverlay.Invalidate();
@@ -919,6 +915,13 @@ public class FaceEnrollmentView : ContentView
             this.hintLabel.Text = hint;
             this.Rejected?.Invoke(this, new FaceEnrollmentRejected(reason, hint));
         }
+    }
+
+    void RefreshGuide()
+    {
+        // Project with the same aspect the drawable uses, even before a face supplies the actual aspect.
+        this.guideDrawable.Guide = this.EffectiveGuide(this.runSteps[this.stepIndex], this.guideDrawable.ImageAspect);
+        this.guideOverlay.Invalidate();
     }
 
     /// <summary>
